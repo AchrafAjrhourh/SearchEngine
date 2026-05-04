@@ -6,32 +6,35 @@ from config import OPENAI_API_KEY
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 def summarize_news(figure_name, raw_text, target_language):
-    logging.info(f"Generating detailed summary and sentiment analysis for {figure_name}...")
+    logging.info(f"Generating strictly formatted summary in {target_language}...")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
-    # We added a "Relevance Check" to the system prompt
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
-    Your goal is to provide a comprehensive briefing in {target_language} for each provided source.
+    Your goal is to provide a briefing in {target_language} for the provided sources.
     
     ### RELEVANCE GUARDRAIL:
-    Before summarizing a source, check if the content is actually about "{figure_name}" or mentions them in a meaningful context. 
-    - If the content is "noise" (e.g., a list of unrelated trending headlines like Trump, sports, or weather that has nothing to do with the figure), ignore it and do NOT output a section for it.
-    - If the figure is mentioned, even if they are not the only subject, provide the summary.
+    Check if the content is actually about "{figure_name}". If it is unrelated noise, ignore it completely.
     
-    For every RELEVANT source, follow this structure (translate labels to {target_language}):
+    ### MANDATORY LOOP INSTRUCTION:
+    You MUST output a separate block for EVERY SINGLE RELEVANT source provided in the raw data. Do not stop after the first one. Separate each block with a horizontal rule (---).
     
-    ### 📰 [Publisher Name]
-    * **Date:** [Date]
-    * **Detailed Summary:** [Provide a deep, 3-5 sentence paragraph covering the 'who, what, where, why, and how'. Mention specific names, numbers, or quotes.]
-    * **Sentiment & Tone:** [Analyze the 'feeling'. Is it Positive, Negative, or Neutral? Is the tone critical, supportive, objective, or sensationalist? Explain why in one sentence.]
-    * **Source:** [Read Full Article](URL)
+    For EACH relevant source, use EXACTLY this format. Translate the labels "Source", "Tonalité", "Viralité", and "Thématique" into {target_language}. Keep the labels bolded.
+    
+    **Source:** [Insert the raw, plain-text URL here so it can be easily copied]
+    
+    **Tonalité:** [MUST be exactly ONE word translated into {target_language}: Positive, Negative, or Neutral. No explanations.]
+    
+    **Viralité:** [Calculate reach based STRICTLY on the [INTERACTIONS/COMMENTS] and [REACH/VIEWS] metadata tags provided for the source. Output a phrase in {target_language} such as "Élevée (15 000 Vues, 400 Commentaires)" or "Faible (0 Vues)". Do not guess; use the exact numbers provided.]
+    
+    **Thématique:** [Provide a deep, 3-5 sentence paragraph summary covering the 'who, what, where, why, and how' based ONLY on the text.]
     
     ---
     
     STRICT RULES:
-    1. INDEPENDENT SECTIONS: Do not merge different news stories.
-    2. NO HALLUCINATIONS: Do not invent details. Base everything STRICTLY on the 'Content' field.
-    3. LANGUAGE: The entire output (headings and body) MUST be in {target_language}.
+    1. INDEPENDENT SECTIONS: You must create a new formatted block for each relevant article.
+    2. NO HALLUCINATIONS: Do not invent details or precise traffic numbers.
+    3. LANGUAGE: The entire output (including the labels) MUST be in {target_language}.
+    4. TONALITÉ FORMAT: The Tonalité must be strictly one word, nothing else.
     """
     
     user_prompt = f"Here is the raw data collected for the search query '{figure_name}':\n{raw_text}"
@@ -43,9 +46,9 @@ def summarize_news(figure_name, raw_text, target_language):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1 # Lowered temperature even more for stricter fact-checking
+            temperature=0.1 # Strictly low temperature
         )
-        # Clean up any potential AI chatter
+        
         result = response.choices[0].message.content.strip()
         
         if not result or len(result) < 10:
