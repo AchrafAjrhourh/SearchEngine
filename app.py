@@ -27,13 +27,11 @@ output_language = st.selectbox(
 
 if st.button("Generate Briefing"):
     if figure_name.strip() == "":
-        st.error("Please enter a name before searching.")
+        st.error("Please enter a name.")
     else:
-        # Step 1: Data Extraction
-        with st.spinner(f"🔍 Searching the web and reading full articles for '{figure_name}'... (This takes about 10-20 seconds)"):
+        with st.spinner(f"🔍 Searching for '{figure_name}'..."):
             live_data = fetch_real_news(figure_name)
         
-        # Step 2: AI Summarization
         if live_data:
             with st.spinner(f"🧠 AI is synthesizing the articles into {output_language}..."):
                 # We now pass the selected output_language to our function!
@@ -48,4 +46,5 @@ if st.button("Generate Briefing"):
             else:
                 st.markdown(final_summary) 
         else:
-            st.warning(f"No recent breaking news found for '{figure_name}' in the last 24 hours. They might be having a quiet day!")
+            # FIX: Ensure this says figure_name, not a hardcoded name!
+            st.warning(f"No recent breaking news found for '{figure_name}' in the last 24 hours.")
