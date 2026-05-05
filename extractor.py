@@ -12,11 +12,11 @@ from deep_translator import GoogleTranslator
 # Load environment variables
 load_dotenv()
 
-# --- CONSTANTS & CONFIG ---
+# --- CONSTANTS & CONFIG (UPGRADED TO 48 HOURS) ---
 NOW = datetime.now(timezone.utc)
-TWENTY_FOUR_HOURS_AGO = NOW - timedelta(days=1)
-UNIX_24H_AGO = int(TWENTY_FOUR_HOURS_AGO.timestamp())
-ISO_24H_AGO = TWENTY_FOUR_HOURS_AGO.isoformat()
+FORTY_EIGHT_HOURS_AGO = NOW - timedelta(days=2)
+UNIX_48H_AGO = int(FORTY_EIGHT_HOURS_AGO.timestamp())
+ISO_48H_AGO = FORTY_EIGHT_HOURS_AGO.isoformat()
 
 # Keys
 YT_API_KEY = os.getenv("YOUTUBE_API_KEY")
@@ -39,7 +39,7 @@ class EliteOSINTExtractor:
         [URL: {url}]
         [INTERACTIONS/COMMENTS: {interactions}]
         [REACH/VIEWS: {reach}]
-        [CONTENT: {content[:1000]}] 
+        [CONTENT: {content[:1500]}] 
         """
         print(f"\n[PAYLOAD READY] -> {platform} | Interactions: {interactions} | Reach: {reach}")
         self.aggregated_data += payload
@@ -88,19 +88,20 @@ class EliteOSINTExtractor:
             self._append_payload("Facebook (via Mega)", title, url, "N/A", "N/A")
 
     # =========================================================
-    # 1. RSS NEWS MEDIA (Reliable Newspaper Links)
+    # 1. RSS NEWS MEDIA (Maximum Web Extraction)
     # =========================================================
     async def fetch_news_media(self):
         encoded_name = urllib.parse.quote(self.target_figure)
         if is_arabic(self.target_figure):
-            rss_url = f"https://news.google.com/rss/search?q={encoded_name}+when:1d&hl=ar&gl=MA&ceid=MA:ar"
+            rss_url = f"https://news.google.com/rss/search?q={encoded_name}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
         else:
-            rss_url = f"https://news.google.com/rss/search?q={encoded_name}+when:1d&hl=en-US&gl=US&ceid=US:en"
+            rss_url = f"https://news.google.com/rss/search?q={encoded_name}+when:2d&hl=en-US&gl=US&ceid=US:en"
 
         try:
-            print(f"⏳ Calling Google RSS News...")
+            print(f"⏳ Calling Google RSS News (Unlimited 48h)...")
             feed = await asyncio.to_thread(feedparser.parse, rss_url)
-            for item in feed.entries[:3]:
+            
+            for item in feed.entries:
                 title = item.title
                 google_url = item.link
                 try:
@@ -112,16 +113,19 @@ class EliteOSINTExtractor:
                 jina_url = f"https://r.jina.ai/{final_url}"
                 headers = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
                 try:
-                    resp = await asyncio.to_thread(requests.get, jina_url, headers=headers, timeout=15)
+                    resp = await asyncio.to_thread(requests.get, jina_url, headers=headers, timeout=12)
                     full_text = resp.text if resp.status_code == 200 else title
                 except Exception:
                     full_text = title
-                self._append_payload("News Media (RSS)", full_text, final_url, "N/A", "N/A")
+                
+                # Appending with a larger character limit for web articles
+                self._append_payload("News Media (RSS)", full_text[:2500], final_url, "N/A", "N/A")
+                await asyncio.sleep(0.2) 
         except Exception as e:
             print(f"❌ RSS News Error: {e}")
 
     # =========================================================
-    # 2. GOOGLE MEGA SEARCH (Multilingual Deep Web)
+    # 2. GOOGLE MEGA SEARCH (Fixed JSON Parsing for Deep Web)
     # =========================================================
     async def fetch_google_mega(self):
         if not RAPID_API_KEY: return
@@ -131,22 +135,26 @@ class EliteOSINTExtractor:
         
         for lang in languages:
             try:
-                # Anti-Rate Limit Staggering
                 await asyncio.sleep(1)
-                
                 if lang == 'ar' and is_arabic(self.target_figure):
                     translated_name = self.target_figure
                 else:
                     translator = GoogleTranslator(source='auto', target=lang)
                     translated_name = await asyncio.to_thread(translator.translate, self.target_figure)
                 
-                print(f"⏳ Calling Google Mega Search | Lang: {lang.upper()} | Query: {translated_name}")
-                params = {"q": translated_name, "gl": "ma", "hl": lang, "tbs": "qdr:d", "autocorrect": "true", "num": "3", "page": "1"}
+                if lang == 'ar': dorked_query = f"{translated_name} المغرب OR site:.ma"
+                elif lang == 'fr': dorked_query = f"{translated_name} Maroc OR site:.ma"
+                else: dorked_query = f"{translated_name} Morocco OR site:.ma"
+
+                print(f"⏳ Calling Google Mega Search | Lang: {lang.upper()} | Query: {dorked_query}")
+                
+                params = {"q": dorked_query, "gl": "ma", "hl": lang, "tbs": "sbd:1,qdr:d2", "autocorrect": "true", "num": "30", "page": "1"}
                 
                 resp = await asyncio.to_thread(requests.get, url, headers=headers, params=params)
                 data = resp.json()
                 
-                results = data.get('results', data.get('data', []))[:2] # Limit to top 2 to save time
+                # --- THE FIX: Broadening the JSON search to catch the web articles ---
+                results = data.get('organic_results', data.get('organic', data.get('items', data.get('results', data.get('data', [])))))
                 
                 for item in results:
                     link = item.get('url', item.get('link', ''))
@@ -158,23 +166,29 @@ class EliteOSINTExtractor:
                         await self._process_ig_link(link, snippet)
                     elif 'facebook.com' in link:
                         await self._process_fb_link(link, snippet)
+                    elif 'youtube.com' in link:
+                        continue # Skip to avoid duplicating our direct YT extraction
                     else:
                         await self._process_web_link(link, title, snippet)
+                    await asyncio.sleep(0.3) 
             except Exception as e:
                 print(f"❌ Google Mega Error ({lang}): {e}")
 
     # =========================================================
-    # 3. YOUTUBE
+    # 3. YOUTUBE (48 Hours - NO LIMITS)
     # =========================================================
     async def fetch_youtube(self):
         if not YT_API_KEY: return
         query = urllib.parse.quote(self.target_figure)
-        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_24H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}"
+        # maxResults=50 pulls the absolute maximum allowed per API call
+        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_48H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=50"
         try:
-            print(f"⏳ Calling YouTube API...")
+            print(f"⏳ Calling YouTube API (Unlimited 48h)...")
             response = await asyncio.to_thread(requests.get, url)
             data = response.json()
-            for item in data.get('items', [])[:3]:
+            
+            # NO SLICE LIMITS
+            for item in data.get('items', []):
                 video_id = item['id']['videoId']
                 stats_url = f"https://www.googleapis.com/youtube/v3/videos?part=statistics&id={video_id}&key={YT_API_KEY}"
                 stats_resp = await asyncio.to_thread(requests.get, stats_url)
@@ -186,7 +200,7 @@ class EliteOSINTExtractor:
             print(f"❌ YouTube Error: {e}")
 
     # =========================================================
-    # 4. INSTAGRAM
+    # 4. INSTAGRAM (48 Hours - NO LIMITS)
     # =========================================================
     async def fetch_instagram(self):
         RAPID_HOST_IG = os.getenv("RAPIDAPI_HOST_INSTAGRAM")
@@ -195,16 +209,18 @@ class EliteOSINTExtractor:
         headers = {"x-rapidapi-key": RAPID_API_KEY, "x-rapidapi-host": RAPID_HOST_IG}
         hashtag = self.target_figure.replace(" ", "")
         try:
-            print(f"⏳ Calling Instagram Search API for #{hashtag}...")
+            print(f"⏳ Calling Instagram Search API for #{hashtag} (Unlimited 48h)...")
             response = await asyncio.to_thread(requests.get, search_url, headers=headers, params={"hashtag": hashtag})
             data = response.json()
             edges = data.get('posts', {}).get('edges', [])
-            count = 0
+            
+            # NO COUNT LIMITS
             for edge in edges:
-                if count >= 3: break 
                 node = edge.get('node', {})
                 timestamp = node.get('taken_at_timestamp', 0)
-                if timestamp > 0 and timestamp < UNIX_24H_AGO: continue 
+                # 48 HOUR FILTER
+                if timestamp > 0 and timestamp < UNIX_48H_AGO: continue 
+                
                 shortcode = node.get('shortcode', '')
                 if not shortcode: continue
                 url = f"https://www.instagram.com/p/{shortcode}/"
@@ -214,24 +230,27 @@ class EliteOSINTExtractor:
                 likes = node.get('edge_liked_by', {}).get('count', 0)
                 comments = node.get('edge_media_to_comment', {}).get('count', 0)
                 self._append_payload("Instagram", text, url, f"{likes} Likes, {comments} Commentaires", "N/A")
-                count += 1 
         except Exception as e:
             print(f"❌ Instagram Crash Error: {e}")
 
     # =========================================================
-    # 5. FACEBOOK
+    # 5. FACEBOOK (48 Hours - NO LIMITS)
     # =========================================================
     async def fetch_facebook(self):
         RAPID_HOST_FB = os.getenv("RAPIDAPI_HOST_FACEBOOK")
         if not RAPID_API_KEY or not RAPID_HOST_FB: return
         search_url = f"https://{RAPID_HOST_FB}/search/global"
         headers = {"x-rapidapi-key": RAPID_API_KEY, "x-rapidapi-host": RAPID_HOST_FB}
-        params = {"query": self.target_figure, "recent_posts": "true", "start_date": TWENTY_FOUR_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
+        # Start date upgraded to 48 Hours ago
+        params = {"query": self.target_figure, "recent_posts": "true", "start_date": FORTY_EIGHT_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
         try:
-            print(f"⏳ Calling Facebook Global API for {self.target_figure}...")
+            print(f"⏳ Calling Facebook Global API for {self.target_figure} (Unlimited 48h)...")
             response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
             data = response.json()
-            posts = data.get('results', data.get('data', []))[:3]
+            
+            # NO SLICE LIMITS
+            posts = data.get('results', data.get('data', []))
+            
             for post in posts:
                 text = post.get('message', post.get('text', '')) 
                 url = post.get('url', 'Facebook Search Result')
@@ -244,22 +263,21 @@ class EliteOSINTExtractor:
             print(f"❌ Facebook Crash Error: {e}")
 
     # =========================================================
-    # ORCHESTRATION (Staggered to prevent RapidAPI blocks)
+    # ORCHESTRATION 
     # =========================================================
     async def _delayed_task(self, coro, delay):
         await asyncio.sleep(delay)
         await coro
 
     async def run_all(self):
-        print("\n--- DEPLOYING STAGGERED MEGA OSINT EXTRACTORS ---")
+        print("\n--- DEPLOYING GOD MODE OSINT EXTRACTORS (48H / UNLIMITED) ---")
         
-        # We start these exactly 1-2 seconds apart so RapidAPI doesn't flag us for spamming
         await asyncio.gather(
-            self.fetch_news_media(),                             # T = 0.0s
-            self.fetch_youtube(),                                # T = 0.0s
-            self._delayed_task(self.fetch_facebook(), 1.5),      # T = 1.5s
-            self._delayed_task(self.fetch_instagram(), 3.0),     # T = 3.0s
-            self._delayed_task(self.fetch_google_mega(), 4.5)    # T = 4.5s
+            self.fetch_news_media(),                             
+            self.fetch_youtube(),                                
+            self._delayed_task(self.fetch_facebook(), 1.5),      
+            self._delayed_task(self.fetch_instagram(), 3.0),     
+            self._delayed_task(self.fetch_google_mega(), 4.5)    
         )
         print("--- OSINT EXTRACTION COMPLETE ---\n")
         return self.aggregated_data
