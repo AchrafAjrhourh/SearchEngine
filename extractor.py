@@ -70,13 +70,10 @@ class EliteOSINTExtractor:
     # 1. RSS NEWS MEDIA (PE ONLY) - FIXED
     # =========================================================
     async def fetch_news_media(self):
-        # Loop through the first 2 synonyms (usually 1 French, 1 Arabic)
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
             
             encoded_query = urllib.parse.quote(f'"{kw}"')
-            
-            # Dynamically switch Google's language index based on the keyword
             if is_arabic(kw):
                 rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
             else:
@@ -85,7 +82,15 @@ class EliteOSINTExtractor:
             try:
                 print(f"⏳ Calling RSS News for: '{kw}'...")
                 feed = await asyncio.to_thread(feedparser.parse, rss_url)
-                for item in feed.entries:
+                
+                # --- NEW LOGGING LOGIC ---
+                entries = feed.entries
+                if not entries:
+                    print(f"⚠️ No RSS News found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(entries)} RSS News articles for '{kw}'.")
+                
+                for item in entries:
                     if self.result_count >= self.max_results: break 
                     
                     title = item.title
@@ -121,7 +126,6 @@ class EliteOSINTExtractor:
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
             try:
-                # Safe Dorking without complex OR operators that break APIs
                 dork = f'"{kw}" (Maroc OR المغرب OR site:.ma)'
                 lang = "ar" if is_arabic(kw) else "fr"
                 
@@ -132,12 +136,17 @@ class EliteOSINTExtractor:
                 data = resp.json()
                 results = data.get('organic_results', data.get('results', data.get('items', [])))
                 
+                # --- NEW LOGGING LOGIC ---
+                if not results:
+                    print(f"⚠️ No Google Mega results found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(results)} Google Mega results for '{kw}'.")
+                
                 for item in results:
                     if self.result_count >= self.max_results: break
                     link = item.get('url', item.get('link', ''))
                     if not link: continue
                     
-                    # STRICT PE FILTER
                     if 'instagram.com' in link or 'facebook.com' in link or 'youtube.com' in link: 
                         continue 
                     else: 
@@ -160,7 +169,15 @@ class EliteOSINTExtractor:
                 print(f"⏳ Calling YouTube API for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, url)
                 data = response.json()
-                for item in data.get('items', []):
+                items = data.get('items', [])
+                
+                # --- NEW LOGGING LOGIC ---
+                if not items:
+                    print(f"⚠️ No YouTube videos found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(items)} YouTube videos for '{kw}'.")
+
+                for item in items:
                     if self.result_count >= self.max_results: break
                     video_id = item['id']['videoId']
                     stats_url = f"https://www.googleapis.com/youtube/v3/videos?part=statistics&id={video_id}&key={YT_API_KEY}"
@@ -182,6 +199,13 @@ class EliteOSINTExtractor:
             print(f"⏳ Calling Instagram for #{hashtag}...")
             response = await asyncio.to_thread(requests.get, search_url, headers=headers, params={"hashtag": hashtag})
             edges = response.json().get('posts', {}).get('edges', [])
+            
+            # --- NEW LOGGING LOGIC ---
+            if not edges:
+                print(f"⚠️ No Instagram posts found for #{hashtag}.")
+            else:
+                print(f"✅ Found {len(edges)} Instagram posts for #{hashtag}.")
+
             for edge in edges:
                 if self.result_count >= self.max_results: break
                 node = edge.get('node', {})
@@ -207,6 +231,13 @@ class EliteOSINTExtractor:
                 print(f"⏳ Calling Facebook for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
                 posts = response.json().get('results', [])
+                
+                # --- NEW LOGGING LOGIC ---
+                if not posts:
+                    print(f"⚠️ No Facebook posts found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(posts)} Facebook posts for '{kw}'.")
+
                 for post in posts:
                     if self.result_count >= self.max_results: break
                     text = post.get('message', post.get('text', ''))
