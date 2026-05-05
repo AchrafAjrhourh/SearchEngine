@@ -1,0 +1,124 @@
+{
+    "entities": {
+        "PAM (Parti de l'Authenticité et de la Modernité)": {
+            "id": "PAM",
+            "keywords": ["pam maroc", "الأصالة والمعاصرة", "حزب الأصالة والمعاصرة", "Parti authenticité et modernité"]
+        },
+        "Fatima Zahra Mansouri": {
+            "id": "FZM",
+            "keywords": ["Fatima Zahra Mansouri", "فاطمة الزهراء المنصوري", "عمدة مراكش فاطمة الزهراء المنصوري"]
+        },
+        "Abdellatif Ouahbi": {
+            "id": "AOU",
+            "keywords": ["Abdellatif Ouahbi", "عبد اللطيف وهبي", "وزير العدل عبد اللطيف وهبي"]
+        },
+        "Mohamed Mehdi Bensaïd": {
+            "id": "MB",
+            "keywords": ["Mehdi Bensaïd", "مهدي بنسعيد", "المهدي بنسعيد", "Mohamed Mehdi Bensaid"]
+        },
+        "Younes Sekkouri": {
+            "id": "YSK",
+            "keywords": ["Younes Sekkouri", "يونس السكوري"]
+        },
+        "Ahmed Akhchichine": {
+            "id": "AAK",
+            "keywords": ["Ahmed Akhchichine", "أحمد أخشيشن"]
+        },
+        "Samir Goudar": {
+            "id": "SGO",
+            "keywords": ["Samir Goudar", "سمير كودار"]
+        },
+        "Hakima El Haite": {
+            "id": "HEH",
+            "keywords": ["Hakima El Haite", "حكيمة الحيطي"]
+        },
+        "Rachid El Abdi": {
+            "id": "REA",
+            "keywords": ["Rachid El Abdi", "رشيد العبدي"]
+        },
+        "Hicham El Mhajri": {
+            "id": "HEM",
+            "keywords": ["Hicham El Mhajri", "هشام المهاجري"]
+        },
+        "Said Naciri": {
+            "id": "SNA",
+            "keywords": ["Said Naciri", "سعيد الناصري"]
+        },
+        "Abdelkader Salama": {
+            "id": "ASA",
+            "keywords": ["Abdelkader Salama", "عبد القادر سلامة"]
+        },
+        "Abdelaziz Boudraa": {
+            "id": "ABO",
+            "keywords": ["Abdelaziz Boudraa", "عبد العزيز بودراع"]
+        },
+        "Mohamed Larbi Belcaid": {
+            "id": "MLB",
+            "keywords": ["Mohamed Larbi Belcaid", "محمد العربي بلقايد"]
+        },
+        "Abdelaziz Driouich": {
+            "id": "ADR",
+            "keywords": ["Abdelaziz Driouich", "عبد العزيز الدريويش"]
+        },
+        "Abdelmajid Baddou": {
+            "id": "ABA",
+            "keywords": ["Abdelmajid Baddou", "عبد المجيد بادو"]
+        },
+        "Fouad Ali El Himma": {
+            "id": "FAH",
+            "keywords": ["Fouad Ali El Himma", "فؤاد عالي الهمة", "عالي الهمة"]
+        },
+        "Ilyas El Omari": {
+            "id": "IEO",
+            "keywords": ["Ilyas El Omari", "إلياس العماري"]
+        },
+        "Aziz Akhannouch": {
+            "id": "AAKH",
+            "keywords": ["عزيز أخنوش", "Aziz Akhannouch", "رئيس الحكومة عزيز أخنوش"]
+        },
+        "Abdelilah Benkirane": {
+            "id": "ABK",
+            "keywords": ["Abdelilah Benkirane", "عبد الإله بنكيران", "بنكيران"]
+        },
+        "Abdellah Bouanou": {
+            "id": "ABOU",
+            "keywords": ["Abdellah Bouanou", "عبد الله بوانو"]
+        },
+        "Driss Lachgar": {
+            "id": "DLA",
+            "keywords": ["Driss Lachgar", "إدريس لشكر"]
+        },
+        "Nizar Baraka": {
+            "id": "NBA",
+            "keywords": ["Nizar Baraka", "نزار بركة"]
+        },
+        "Mustapha Baitas": {
+            "id": "MBA",
+            "keywords": ["Mustapha Baitas", "مصطفى بايتاس", "الناطق الرسمي باسم الحكومة"]
+        },
+        "Abdellatif Jouahri": {
+            "id": "AJO",
+            "keywords": ["Abdellatif Jouahri", "عبد اللطيف الجواهري", "والي بنك المغرب"]
+        },
+        "Abdelouafi Laftit": {
+            "id": "ALA",
+            "keywords": ["Abdelouafi Laftit", "عبد الوافي لفتيت", "وزير الداخلية عبد الوافي لفتيت"]
+        },
+        "Nadia Fettah Alaoui": {
+            "id": "NFA",
+            "keywords": ["Nadia Fettah Alaoui", "نادية فتاح العلوي"]
+        },
+        "Mohamed Sadiki": {
+            "id": "MSA",
+            "keywords": ["Mohamed Sadiki", "محمد صديقي"]
+        },
+        "Khalid Ait Taleb": {
+            "id": "KAT",
+            "keywords": ["Khalid Ait Taleb", "خالد آيت الطالب", "وزير الصحة خالد آيت الطالب"]
+        }
+    },
+    "scopes": {
+        "Social Media": "RS",
+        "Politics (News & Web)": "PE"
+    }
+}
