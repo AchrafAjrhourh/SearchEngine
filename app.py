@@ -100,7 +100,12 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
                 # 2. Format for WhatsApp (Convert Markdown **bold** to WhatsApp *bold*)
                 whatsapp_ready_text = clean_block.replace("**", "*")
                 
-                # 3. The Magic 1-Click Copy Button
-                st_copy_to_clipboard(whatsapp_ready_text, text="📋 Copier pour WhatsApp", key=f"copy_btn_{idx}")
+                # 3. The Magic 1-Click Copy Button (Corrected parameters)
+                st_copy_to_clipboard(
+                    text=whatsapp_ready_text, 
+                    before_copy_label="📋 Copier pour WhatsApp", 
+                    after_copy_label="✅ Copié!", 
+                    key=f"copy_btn_{idx}"
+                )
                 
                 st.markdown("---")
