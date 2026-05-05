@@ -10,21 +10,20 @@ def process_batch(figure_name, batch_text, system_prompt):
     """Processes a small chunk of data so the AI never gets overwhelmed or lazy."""
     try:
         response = client.chat.completions.create(
-            # UPGRADED TO GPT-4o for maximum logic, obedience, and extraction capability
             model="gpt-4o", 
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Voici un lot de données brutes pour '{figure_name}':\n{batch_text}"}
             ],
             temperature=0.2,
-            max_tokens=4096 # Maximum allowed output to prevent cutting off
+            max_tokens=4096 
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         logging.error(f"AI Batch Error: {e}")
         return ""
 
-def summarize_news(figure_name, raw_text):
+def summarize_news(figure_name, figure_id, raw_text):
     logging.info("Generating God Mode summary in French via Data Chunking...")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
@@ -41,6 +40,8 @@ def summarize_news(figure_name, raw_text):
     
     **Source:** [Insert the raw, plain-text URL here so it can be easily copied]
     
+    **ID:** {figure_id}
+    
     **Tonalité:** [MUST be exactly ONE word in French: Positive, Négative, or Neutre. No explanations.]
     
     **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)" or "Élevée (32203 Réactions, 10898 Commentaires)".
@@ -56,26 +57,19 @@ def summarize_news(figure_name, raw_text):
     3. TONALITÉ FORMAT: Strictly one word.
     """
     
-    # 1. SPLIT THE RAW TEXT INTO INDIVIDUAL BLOCKS
-    # This prevents the AI from hitting the output limit
     blocks = raw_text.split("[PLATFORM:")
-    # Re-add the split string and remove empty spaces
     blocks = ["[PLATFORM:" + b for b in blocks if b.strip()]
     
     if not blocks:
         return f"Aucune actualité pertinente trouvée pour '{figure_name}'."
 
-    # 2. GROUP INTO BATCHES OF 8 SOURCES
     batch_size = 8
     batches = ["\n\n".join(blocks[i:i + batch_size]) for i in range(0, len(blocks), batch_size)]
     
     logging.info(f"Total sources found: {len(blocks)}. Processing in {len(batches)} batches...")
 
-    # 3. PROCESS BATCHES CONCURRENTLY
-    # This stitches all the AI outputs back together smoothly
     final_results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        # executor.map ensures the results stay in the correct order
         results = list(executor.map(lambda b: process_batch(figure_name, b, system_prompt), batches))
         
         for res in results:
@@ -85,5 +79,4 @@ def summarize_news(figure_name, raw_text):
     if not final_results:
          return f"Aucune actualité pertinente trouvée pour '{figure_name}' dans les articles traités."
 
-    # 4. RETURN THE MASSIVE STITCHED DASHBOARD
     return "\n\n".join(final_results)
