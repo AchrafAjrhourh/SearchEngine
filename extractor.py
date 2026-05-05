@@ -32,8 +32,6 @@ class EliteOSINTExtractor:
         self.keywords = keywords_list
         self.scope_id = scope_id # "RS" or "PE"
         self.main_kw = keywords_list[0] if keywords_list else ""
-        self.query_or = " OR ".join([f'"{k}"' for k in self.keywords[:4]])
-        self.yt_query_or = " | ".join([f'"{k}"' for k in self.keywords[:4]])
         
         self.aggregated_data = ""
         self.result_count = 0  
@@ -69,91 +67,108 @@ class EliteOSINTExtractor:
         self._append_payload("Google Mega Web", full_text, url, "N/A", "N/A")
 
     # =========================================================
-    # 1. RSS NEWS MEDIA (PE ONLY)
+    # 1. RSS NEWS MEDIA (PE ONLY) - FIXED
     # =========================================================
     async def fetch_news_media(self):
-        encoded_query = urllib.parse.quote(self.query_or)
-        rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
+        # Loop through the first 2 synonyms (usually 1 French, 1 Arabic)
+        for kw in self.keywords[:2]:
+            if self.result_count >= self.max_results: break
+            
+            encoded_query = urllib.parse.quote(f'"{kw}"')
+            
+            # Dynamically switch Google's language index based on the keyword
+            if is_arabic(kw):
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
+            else:
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=fr&gl=MA&ceid=MA:fr"
 
-        try:
-            print(f"⏳ Calling RSS News for: {self.query_or[:50]}...")
-            feed = await asyncio.to_thread(feedparser.parse, rss_url)
-            for item in feed.entries:
-                if self.result_count >= self.max_results: break 
-                
-                title = item.title
-                google_url = item.link
-                try:
-                    decoded = gnewsdecoder(google_url)
-                    final_url = decoded["decoded_url"] if decoded.get("status") else google_url
-                except:
-                    final_url = google_url
+            try:
+                print(f"⏳ Calling RSS News for: '{kw}'...")
+                feed = await asyncio.to_thread(feedparser.parse, rss_url)
+                for item in feed.entries:
+                    if self.result_count >= self.max_results: break 
+                    
+                    title = item.title
+                    google_url = item.link
+                    try:
+                        decoded = gnewsdecoder(google_url)
+                        final_url = decoded["decoded_url"] if decoded.get("status") else google_url
+                    except:
+                        final_url = google_url
 
-                jina_url = f"https://r.jina.ai/{final_url}"
-                headers = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
-                try:
-                    resp = await asyncio.to_thread(requests.get, jina_url, headers=headers, timeout=12)
-                    full_text = resp.text if resp.status_code == 200 else title
-                except Exception:
-                    full_text = title
-                
-                if not self._append_payload("News Media (RSS)", full_text[:2500], final_url, "N/A", "N/A"):
-                    break
-                await asyncio.sleep(0.2) 
-        except Exception as e:
-            print(f"❌ RSS News Error: {e}")
+                    jina_url = f"https://r.jina.ai/{final_url}"
+                    headers = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
+                    try:
+                        resp = await asyncio.to_thread(requests.get, jina_url, headers=headers, timeout=12)
+                        full_text = resp.text if resp.status_code == 200 else title
+                    except Exception:
+                        full_text = title
+                    
+                    if not self._append_payload("News Media (RSS)", full_text[:2500], final_url, "N/A", "N/A"):
+                        break
+                    await asyncio.sleep(0.2) 
+            except Exception as e:
+                print(f"❌ RSS News Error: {e}")
 
     # =========================================================
-    # 2. GOOGLE MEGA SEARCH (PE ONLY)
+    # 2. GOOGLE MEGA SEARCH (PE ONLY) - FIXED
     # =========================================================
     async def fetch_google_mega(self):
         if not RAPID_API_KEY or self.result_count >= self.max_results: return
         url = f"https://{RAPID_HOST_GOOGLE}/search"
         headers = {"x-rapidapi-key": RAPID_API_KEY, "x-rapidapi-host": RAPID_HOST_GOOGLE}
         
-        try:
-            dork = f"({self.query_or}) (Maroc OR المغرب OR site:.ma)"
-            print(f"⏳ Calling Google Mega Search | Dork: {dork[:50]}...")
-            
-            params = {"q": dork, "gl": "ma", "hl": "ar", "tbs": "sbd:1,qdr:d2", "autocorrect": "true", "num": "30", "page": "1"}
-            resp = await asyncio.to_thread(requests.get, url, headers=headers, params=params)
-            data = resp.json()
-            results = data.get('organic_results', data.get('results', data.get('items', [])))
-            
-            for item in results:
-                if self.result_count >= self.max_results: break
-                link = item.get('url', item.get('link', ''))
-                if not link: continue
+        for kw in self.keywords[:2]:
+            if self.result_count >= self.max_results: break
+            try:
+                # Safe Dorking without complex OR operators that break APIs
+                dork = f'"{kw}" (Maroc OR المغرب OR site:.ma)'
+                lang = "ar" if is_arabic(kw) else "fr"
                 
-                # STRICT PE FILTER: Ignore social media links found in Google Search
-                if 'instagram.com' in link or 'facebook.com' in link or 'youtube.com' in link: 
-                    continue 
-                else: 
-                    await self._process_web_link(link, item.get('title', ''), item.get('snippet', ''))
-                await asyncio.sleep(0.3) 
-        except Exception as e:
-            print(f"❌ Google Mega Error: {e}")
+                print(f"⏳ Calling Google Mega Search | Dork: {dork[:50]}...")
+                
+                params = {"q": dork, "gl": "ma", "hl": lang, "tbs": "sbd:1,qdr:d2", "autocorrect": "true", "num": "15", "page": "1"}
+                resp = await asyncio.to_thread(requests.get, url, headers=headers, params=params)
+                data = resp.json()
+                results = data.get('organic_results', data.get('results', data.get('items', [])))
+                
+                for item in results:
+                    if self.result_count >= self.max_results: break
+                    link = item.get('url', item.get('link', ''))
+                    if not link: continue
+                    
+                    # STRICT PE FILTER
+                    if 'instagram.com' in link or 'facebook.com' in link or 'youtube.com' in link: 
+                        continue 
+                    else: 
+                        await self._process_web_link(link, item.get('title', ''), item.get('snippet', ''))
+                    await asyncio.sleep(0.3) 
+            except Exception as e:
+                print(f"❌ Google Mega Error: {e}")
 
     # =========================================================
-    # 3. YOUTUBE (RS ONLY)
+    # 3. YOUTUBE (RS ONLY) - FIXED
     # =========================================================
     async def fetch_youtube(self):
         if not YT_API_KEY or self.result_count >= self.max_results: return
-        query = urllib.parse.quote(self.yt_query_or)
-        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_48H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=50"
-        try:
-            print(f"⏳ Calling YouTube API...")
-            response = await asyncio.to_thread(requests.get, url)
-            data = response.json()
-            for item in data.get('items', []):
-                if self.result_count >= self.max_results: break
-                video_id = item['id']['videoId']
-                stats_url = f"https://www.googleapis.com/youtube/v3/videos?part=statistics&id={video_id}&key={YT_API_KEY}"
-                stats_resp = await asyncio.to_thread(requests.get, stats_url)
-                stats = stats_resp.json()['items'][0]['statistics']
-                self._append_payload("YouTube", item['snippet']['title'], f"https://youtu.be/{video_id}", stats.get('commentCount', '0'), stats.get('viewCount', '0'))
-        except Exception as e:
-            print(f"❌ YouTube Error: {e}")
+        
+        for kw in self.keywords[:2]:
+            if self.result_count >= self.max_results: break
+            query = urllib.parse.quote(f'"{kw}"')
+            url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_48H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=25"
+            try:
+                print(f"⏳ Calling YouTube API for '{kw}'...")
+                response = await asyncio.to_thread(requests.get, url)
+                data = response.json()
+                for item in data.get('items', []):
+                    if self.result_count >= self.max_results: break
+                    video_id = item['id']['videoId']
+                    stats_url = f"https://www.googleapis.com/youtube/v3/videos?part=statistics&id={video_id}&key={YT_API_KEY}"
+                    stats_resp = await asyncio.to_thread(requests.get, stats_url)
+                    stats = stats_resp.json()['items'][0]['statistics']
+                    self._append_payload("YouTube", item['snippet']['title'], f"https://youtu.be/{video_id}", stats.get('commentCount', '0'), stats.get('viewCount', '0'))
+            except Exception as e:
+                print(f"❌ YouTube Error: {e}")
 
     # =========================================================
     # 4. INSTAGRAM (RS ONLY)
@@ -187,7 +202,7 @@ class EliteOSINTExtractor:
         
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
-            params = {"query": kw, "recent_posts": "true", "start_date": FORTY_EIGHT_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
+            params = {"query": f'"{kw}"', "recent_posts": "true", "start_date": FORTY_EIGHT_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
             try:
                 print(f"⏳ Calling Facebook for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
@@ -207,7 +222,6 @@ class EliteOSINTExtractor:
         print(f"\n--- DEPLOYING OSINT EXTRACTORS | SCOPE: {self.scope_id} (MAX {self.max_results}) ---")
         tasks = []
         
-        # Deploy specific extractors based on the user's intent!
         if self.scope_id == "PE":
             tasks.append(self.fetch_news_media())
             tasks.append(self._delayed_task(self.fetch_google_mega(), 1.5))
