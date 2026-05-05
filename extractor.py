@@ -22,9 +22,11 @@ YT_API_KEY = os.getenv("YOUTUBE_API_KEY")
 RAPID_API_KEY = os.getenv("RAPIDAPI_KEY")
 RAPID_HOST_IG = os.getenv("RAPIDAPI_HOST_INSTAGRAM")
 RAPID_HOST_FB = os.getenv("RAPIDAPI_HOST_FACEBOOK")
-RAPID_HOST_GOOGLE = os.getenv("RAPIDAPI_HOST_GOOGLE")
-RAPID_HOST_TWITTER = os.getenv("RAPIDAPI_HOST_TWITTER")
-RAPID_HOST_TIKTOK = os.getenv("RAPIDAPI_HOST_TIKTOK")
+RAPID_HOST_GOOGLE = os.getenv("RAPIDAPI_HOST_GOOGLE", "google-search-master-mega.p.rapidapi.com")
+
+# --- FIXED: Matching exact .env variable names with bulletproof fallbacks ---
+RAPID_HOST_TWITTER = os.getenv("RAPID_HOST_TWITTER", "twitter-api45.p.rapidapi.com")
+RAPID_HOST_TIKTOK = os.getenv("RAPID_HOST_TIKTOK", "tiktok-api23.p.rapidapi.com")
 
 def is_arabic(text):
     return bool(re.search(r'[\u0600-\u06FF]', text))
@@ -158,7 +160,7 @@ class EliteOSINTExtractor:
                 print(f"❌ Google Mega Error: {e}")
 
     # =========================================================
-    # 3. YOUTUBE (RS ONLY) - FIXED
+    # 3. YOUTUBE (RS ONLY) 
     # =========================================================
     async def fetch_youtube(self):
         if not YT_API_KEY or self.result_count >= self.max_results: return
@@ -170,10 +172,15 @@ class EliteOSINTExtractor:
             try:
                 print(f"⏳ Calling YouTube API for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, url)
+                
+                # --- API HEALTH CHECK ---
+                if response.status_code != 200:
+                    print(f"🚨 API ERROR [YouTube]: Code {response.status_code} -> {response.text}")
+                    continue
+                    
                 data = response.json()
                 items = data.get('items', [])
                 
-                # --- NEW LOGGING LOGIC ---
                 if not items:
                     print(f"⚠️ No YouTube videos found for '{kw}'.")
                 else:
@@ -187,7 +194,7 @@ class EliteOSINTExtractor:
                     stats = stats_resp.json()['items'][0]['statistics']
                     self._append_payload("YouTube", item['snippet']['title'], f"https://youtu.be/{video_id}", stats.get('commentCount', '0'), stats.get('viewCount', '0'))
             except Exception as e:
-                print(f"❌ YouTube Error: {e}")
+                print(f"❌ YouTube Crash: {e}")
 
     # =========================================================
     # 4. INSTAGRAM (RS ONLY)
@@ -200,9 +207,14 @@ class EliteOSINTExtractor:
             hashtag = self.main_kw.replace(" ", "")
             print(f"⏳ Calling Instagram for #{hashtag}...")
             response = await asyncio.to_thread(requests.get, search_url, headers=headers, params={"hashtag": hashtag})
+            
+            # --- API HEALTH CHECK ---
+            if response.status_code != 200:
+                print(f"🚨 API ERROR [Instagram]: Code {response.status_code} -> {response.text}")
+                return
+                
             edges = response.json().get('posts', {}).get('edges', [])
             
-            # --- NEW LOGGING LOGIC ---
             if not edges:
                 print(f"⚠️ No Instagram posts found for #{hashtag}.")
             else:
@@ -216,7 +228,7 @@ class EliteOSINTExtractor:
                 cap = node.get('edge_media_to_caption', {}).get('edges', [{}])[0].get('node', {}).get('text', 'IG Post')
                 self._append_payload("Instagram", cap, url, f"{node.get('edge_liked_by', {}).get('count', 0)} Likes", "N/A")
         except Exception as e:
-            print(f"❌ Instagram Error: {e}")
+            print(f"❌ Instagram Crash: {e}")
 
     # =========================================================
     # 5. FACEBOOK (RS ONLY)
@@ -232,9 +244,14 @@ class EliteOSINTExtractor:
             try:
                 print(f"⏳ Calling Facebook for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
+                
+                # --- API HEALTH CHECK ---
+                if response.status_code != 200:
+                    print(f"🚨 API ERROR [Facebook]: Code {response.status_code} -> {response.text}")
+                    continue
+                    
                 posts = response.json().get('results', [])
                 
-                # --- NEW LOGGING LOGIC ---
                 if not posts:
                     print(f"⚠️ No Facebook posts found for '{kw}'.")
                 else:
@@ -246,7 +263,7 @@ class EliteOSINTExtractor:
                     if not text: continue
                     self._append_payload("Facebook", text, post.get('url'), f"{post.get('reactions_count', 0)} Réactions", f"{post.get('reshare_count', 0)} Partages")
             except Exception as e:
-                print(f"❌ Facebook Error: {e}")
+                print(f"❌ Facebook Crash: {e}")
 
     # =========================================================
     # 6. X (TWITTER) (RS ONLY)
@@ -262,6 +279,11 @@ class EliteOSINTExtractor:
             try:
                 print(f"⏳ Calling X (Twitter) for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
+                
+                if response.status_code != 200:
+                    print(f"🚨 API ERROR [X/Twitter]: Code {response.status_code} -> {response.text}")
+                    continue
+                    
                 tweets = response.json().get('timeline', [])
                 
                 if not tweets:
@@ -273,19 +295,24 @@ class EliteOSINTExtractor:
                     if self.result_count >= self.max_results: break
                     if tweet.get('type') != 'tweet': continue
                     
-                    text = tweet.get('text', '')
-                    if not text: continue
-                    
-                    # Optional 48h Time check
-                    try:
-                        created_at = datetime.strptime(tweet.get('created_at'), "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
-                        if created_at < FORTY_EIGHT_HOURS_AGO: continue
-                    except:
-                        pass # If parsing fails, rely on 'Latest' API parameter
-                    
+                    # 1. Build the URL early so we can print it
                     tweet_id = tweet.get('tweet_id')
                     screen_name = tweet.get('user_info', {}).get('screen_name', 'i')
                     url = f"https://x.com/{screen_name}/status/{tweet_id}"
+                    
+                    print(f"  🔗 [X] Investigating: {url}")
+                    
+                    text = tweet.get('text', '')
+                    if not text: continue
+                    
+                    # 2. Check the 48-hour rule
+                    try:
+                        created_at = datetime.strptime(tweet.get('created_at'), "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
+                        if created_at < FORTY_EIGHT_HOURS_AGO: 
+                            print("     ❌ Skipped: Plus vieux que 48 heures")
+                            continue
+                    except:
+                        pass 
                     
                     likes = tweet.get('favorites', 0)
                     retweets = tweet.get('retweets', 0)
@@ -293,7 +320,7 @@ class EliteOSINTExtractor:
                     
                     self._append_payload("X (Twitter)", text, url, f"{likes} Likes, {retweets} Reposts", f"{views} Vues")
             except Exception as e:
-                print(f"❌ X (Twitter) Error: {e}")
+                print(f"❌ X (Twitter) Crash: {e}")
 
     # =========================================================
     # 7. TIKTOK (RS ONLY)
@@ -305,11 +332,15 @@ class EliteOSINTExtractor:
         
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
-            # Base parameters per API documentation
             params = {"keyword": kw, "cursor": "0", "search_id": "0"}
             try:
                 print(f"⏳ Calling TikTok for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
+                
+                if response.status_code != 200:
+                    print(f"🚨 API ERROR [TikTok]: Code {response.status_code} -> {response.text}")
+                    continue
+                    
                 videos = response.json().get('item_list', [])
                 
                 if not videos:
@@ -320,15 +351,20 @@ class EliteOSINTExtractor:
                 for video in videos:
                     if self.result_count >= self.max_results: break
                     
-                    # 48h Time Filter
-                    create_time = video.get('createTime', 0)
-                    if create_time > 0 and create_time < UNIX_48H_AGO: continue
-                    
-                    text = video.get('desc', 'Vidéo TikTok')
+                    # 1. Build the URL early so we can print it
                     video_id = video.get('id')
                     author_id = video.get('author', {}).get('uniqueId', '_')
                     url = f"https://www.tiktok.com/@{author_id}/video/{video_id}"
                     
+                    print(f"  🔗 [TikTok] Investigating: {url}")
+                    
+                    # 2. Check the 48-hour rule
+                    create_time = video.get('createTime', 0)
+                    if create_time > 0 and create_time < UNIX_48H_AGO: 
+                        print("     ❌ Skipped: Plus vieux que 48 heures")
+                        continue
+                    
+                    text = video.get('desc', 'Vidéo TikTok')
                     stats = video.get('stats', {})
                     likes = stats.get('diggCount', 0)
                     comments = stats.get('commentCount', 0)
@@ -336,7 +372,7 @@ class EliteOSINTExtractor:
                     
                     self._append_payload("TikTok", text, url, f"{likes} Likes, {comments} Commentaires", f"{views} Vues")
             except Exception as e:
-                print(f"❌ TikTok Error: {e}")
+                print(f"❌ TikTok Crash: {e}")
 
     # =========================================================
     # DYNAMIC ORCHESTRATOR
@@ -352,11 +388,14 @@ class EliteOSINTExtractor:
             tasks.append(self.fetch_youtube())
             tasks.append(self._delayed_task(self.fetch_facebook(), 1.5))
             tasks.append(self._delayed_task(self.fetch_instagram(), 3.0))
+            tasks.append(self._delayed_task(self.fetch_twitter(), 4.5))
+            tasks.append(self._delayed_task(self.fetch_tiktok(), 6.0))
         
         await asyncio.gather(*tasks)
         print(f"--- EXTRACTION COMPLETE: FOUND {self.result_count} TOTAL SOURCES ---\n")
         return self.aggregated_data
 
+    # --- THE MISSING HELPER FUNCTION ---
     async def _delayed_task(self, coro, delay):
         await asyncio.sleep(delay)
         await coro
