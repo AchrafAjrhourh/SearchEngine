@@ -4,3 +4,4 @@ python-dotenv
 requests
 feedparser
 googlenewsdecoder
+deep_translator
