@@ -1,5 +1,7 @@
 import streamlit as st
 import logging
+import json
+import os
 from config import setup_logging
 from extractor import execute_deep_social_extraction
 from summarizer import summarize_news
@@ -7,33 +9,84 @@ from summarizer import summarize_news
 # Initialize background terminal logging
 setup_logging()
 
+# --- LOAD JSON DICTIONARY ---
+if not os.path.exists("entities.json"):
+    with open("entities.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "entities": {
+                "Mehdi Bensaïd": {"id": "MB", "keywords": ["مهدي بنسعيد", "Mehdi Bensaïd"]}
+            },
+            "scopes": {
+                "Réseaux Sociaux (Social Media)": "RS",
+                "Siaq I3lami / Politique (News & Web)": "PE"
+            }
+        }, f, ensure_ascii=False, indent=4)
+
+with open("entities.json", "r", encoding="utf-8") as f:
+    config_data = json.load(f)
+    ENTITIES = config_data.get("entities", {})
+    SCOPES = config_data.get("scopes", {})
+
 # --- WEB PAGE CONFIGURATION ---
 st.set_page_config(page_title="Global News Aggregator", page_icon="🌍", layout="centered")
 
 st.title("🌍 Global AI News Aggregator")
-st.markdown("Search for any public figure to get an AI-summarized briefing of their latest news across the globe in the last 48 hours. Output is standardized in French.")
-
+st.markdown("Sélectionnez une cible et une portée de recherche pour générer le rapport.")
 st.divider()
 
+# --- SESSION STATE INITIALIZATION (Mobile Persistence) ---
+if "last_searched" not in st.session_state:
+    st.session_state.last_searched = ""
+if "final_report" not in st.session_state:
+    st.session_state.final_report = None
+
 # --- USER INPUT ---
-# 1. Figure Name Input
-figure_name = st.text_input("🕵️ Enter the name of the figure:")
+col1, col2 = st.columns(2)
+
+with col1:
+    options = ["-- Recherche personnalisée --"] + list(ENTITIES.keys())
+    selected_id = st.selectbox("🕵️ Cible:", options)
+
+with col2:
+    selected_scope_display = st.selectbox("📡 Type de source (Scope):", list(SCOPES.keys()))
+    scope_id = SCOPES[selected_scope_display]
+
+if selected_id == "-- Recherche personnalisée --":
+    custom_name = st.text_input("Ou tapez un nom libre:")
+    target_keywords = [custom_name] if custom_name.strip() else []
+    display_name = custom_name
+    entity_id = "CUSTOM"
+else:
+    target_keywords = ENTITIES[selected_id]["keywords"]
+    entity_id = ENTITIES[selected_id]["id"]
+    display_name = selected_id
 
 if st.button("Generate Briefing"):
-    if figure_name.strip() == "":
-        st.error("Please enter a name.")
+    if not target_keywords:
+        st.error("Veuillez entrer ou sélectionner un nom.")
     else:
-        # Step 1: Data Extraction
-        with st.spinner(f"🔍 Deploying God Mode OSINT extractors across Web, YouTube, Facebook, and Instagram for '{figure_name}'..."):
-            live_data = execute_deep_social_extraction(figure_name)
+        # Create the final composite ID (e.g. MB-RS or PAM-PE)
+        composite_id = f"{entity_id}-{scope_id}"
         
-        if live_data:
-            with st.spinner(f"🧠 AI is synthesizing and translating all global data into French..."):
-                # We removed the output_language variable. It natively defaults to French now.
-                final_summary = summarize_news(figure_name, live_data)
+        st.session_state.last_searched = f"{display_name}_{scope_id}"
+        st.session_state.final_report = None 
+        
+        with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
+            # Pass the scope_id to the extractor!
+            data = execute_deep_social_extraction(target_keywords, scope_id)
             
-            # Step 3: Display the Final Output
-            st.success("✅ Briefing Complete!")
-            st.markdown(final_summary) 
-        else:
-            st.warning(f"Aucune actualité récente trouvée pour '{figure_name}' au cours des 48 dernières heures.")
+            if data:
+                with st.spinner("🧠 IA en cours de synthèse (Génération du rapport)..."):
+                    # Pass the composite ID to the summarizer!
+                    report = summarize_news(display_name, composite_id, data)
+                    st.session_state.final_report = report
+            else:
+                st.session_state.final_report = "EMPTY"
+
+# --- PERSISTENT DISPLAY ---
+if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
+    if st.session_state.final_report == "EMPTY":
+        st.warning(f"Aucune donnée trouvée pour '{display_name}' dans la catégorie {scope_id}.")
+    elif st.session_state.final_report:
+        st.success(f"✅ Briefing Complete! (Filtre: {scope_id})")
+        st.markdown(st.session_state.final_report)
