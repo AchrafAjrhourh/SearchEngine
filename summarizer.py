@@ -24,7 +24,8 @@ def summarize_news(figure_name, raw_text, target_language):
     
     **Tonalité:** [MUST be exactly ONE word translated into {target_language}: Positive, Negative, or Neutral. No explanations.]
     
-    **Viralité:** [Calculate reach based STRICTLY on the [INTERACTIONS/COMMENTS] and [REACH/VIEWS] metadata tags provided for the source. Output a phrase in {target_language} such as "Élevée (15 000 Vues, 400 Commentaires)" or "Faible (0 Vues)". Do not guess; use the exact numbers provided.]
+    **Viralité:** - RULE 1 (SOCIAL MEDIA): If the source provides exact numbers in the [INTERACTIONS/COMMENTS] or [REACH/VIEWS] tags, you MUST use exactly those numbers. Example in French: "Élevée (32203 Réactions, 10898 Commentaires)".
+    - RULE 2 (NEWS WEBSITES): If the metrics say "N/A" (because it is a news website), you MUST ESTIMATE the traffic. Guess a realistic, random number of readers based on the publisher's notoriety and the time elapsed. The number MUST be in the thousands (e.g., a major national site gets ~85,000, a local blog gets ~3,500). Output it like this in {target_language}: "Moyenne (~12 500 Vues estimées)" or "Élevée (~150 000 Vues estimées)".
     
     **Thématique:** [Provide a deep, 3-5 sentence paragraph summary covering the 'who, what, where, why, and how' based ONLY on the text.]
     
@@ -32,9 +33,8 @@ def summarize_news(figure_name, raw_text, target_language):
     
     STRICT RULES:
     1. INDEPENDENT SECTIONS: You must create a new formatted block for each relevant article.
-    2. NO HALLUCINATIONS: Do not invent details or precise traffic numbers.
-    3. LANGUAGE: The entire output (including the labels) MUST be in {target_language}.
-    4. TONALITÉ FORMAT: The Tonalité must be strictly one word, nothing else.
+    2. LANGUAGE: The entire output (including the labels) MUST be in {target_language}.
+    3. TONALITÉ FORMAT: The Tonalité must be strictly one word, nothing else.
     """
     
     user_prompt = f"Here is the raw data collected for the search query '{figure_name}':\n{raw_text}"
@@ -46,7 +46,7 @@ def summarize_news(figure_name, raw_text, target_language):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1 # Strictly low temperature
+            temperature=0.3 # Slightly raised to 0.3 so it has enough creativity to "guess" realistic view numbers for websites
         )
         
         result = response.choices[0].message.content.strip()
