@@ -1,61 +1,89 @@
 import logging
+import concurrent.futures
 from datetime import datetime
 from openai import OpenAI
 from config import OPENAI_API_KEY
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def summarize_news(figure_name, raw_text, target_language):
-    logging.info(f"Generating strictly formatted summary in {target_language}...")
+def process_batch(figure_name, batch_text, system_prompt):
+    """Processes a small chunk of data so the AI never gets overwhelmed or lazy."""
+    try:
+        response = client.chat.completions.create(
+            # UPGRADED TO GPT-4o for maximum logic, obedience, and extraction capability
+            model="gpt-4o", 
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Voici un lot de données brutes pour '{figure_name}':\n{batch_text}"}
+            ],
+            temperature=0.2,
+            max_tokens=4096 # Maximum allowed output to prevent cutting off
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logging.error(f"AI Batch Error: {e}")
+        return ""
+
+def summarize_news(figure_name, raw_text):
+    logging.info("Generating God Mode summary in French via Data Chunking...")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
-    Your goal is to provide a briefing in {target_language} for the provided sources.
+    Your goal is to provide a briefing in French for the provided sources. No matter what language the original source is in, translate and summarize everything into French.
     
     ### RELEVANCE GUARDRAIL:
-    Check if the content is actually about "{figure_name}". If it is unrelated noise, ignore it completely.
+    Check if the content is actually about "{figure_name}". If it is completely unrelated noise, ignore it. However, if the figure is mentioned or the context is relevant, you MUST process it.
     
     ### MANDATORY LOOP INSTRUCTION:
-    You MUST output a separate block for EVERY SINGLE RELEVANT source provided in the raw data. Do not stop after the first one. Separate each block with a horizontal rule (---).
+    You MUST output a separate block for EVERY SINGLE RELEVANT source provided in this batch. DO NOT SKIP ANY. Separate each block with a horizontal rule (---).
     
-    For EACH relevant source, use EXACTLY this format. Translate the labels "Source", "Tonalité", "Viralité", and "Thématique" into {target_language}. Keep the labels bolded.
+    For EACH relevant source, use EXACTLY this format. Keep the labels bolded.
     
     **Source:** [Insert the raw, plain-text URL here so it can be easily copied]
     
-    **Tonalité:** [MUST be exactly ONE word translated into {target_language}: Positive, Negative, or Neutral. No explanations.]
+    **Tonalité:** [MUST be exactly ONE word in French: Positive, Négative, or Neutre. No explanations.]
     
-    **Viralité:** - RULE 1 (SOCIAL MEDIA): If the source provides exact numbers in the [INTERACTIONS/COMMENTS] or [REACH/VIEWS] tags, you MUST use exactly those numbers. Example in French: "Élevée (32203 Réactions, 10898 Commentaires)".
-    - RULE 2 (NEWS WEBSITES): If the metrics say "N/A" (because it is a news website), you MUST ESTIMATE the traffic. Guess a realistic, random number of readers based on the publisher's notoriety and the time elapsed. The number MUST be in the thousands (e.g., a major national site gets ~85,000, a local blog gets ~3,500). Output it like this in {target_language}: "Moyenne (~12 500 Vues estimées)" or "Élevée (~150 000 Vues estimées)".
+    **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)" or "Élevée (32203 Réactions, 10898 Commentaires)".
+    - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A" (meaning it is a standard web article), you MUST ESTIMATE the traffic. Guess a realistic, random number of readers based on the publisher's notoriety. The number MUST be in the thousands. Output it like this: "Moyenne (~12 500 Vues estimées)".
     
-    **Thématique:** [Provide a deep, 3-5 sentence paragraph summary covering the 'who, what, where, why, and how' based ONLY on the text.]
+    **Thématique:** [If the source is a detailed news article, provide a deep 3-5 sentence summary. If the source is a short social media post, a concise 1-2 sentence summary is required. ALL TEXT MUST BE IN FRENCH.]
     
     ---
     
     STRICT RULES:
-    1. INDEPENDENT SECTIONS: You must create a new formatted block for each relevant article.
-    2. LANGUAGE: The entire output (including the labels) MUST be in {target_language}.
-    3. TONALITÉ FORMAT: The Tonalité must be strictly one word, nothing else.
+    1. INDEPENDENT SECTIONS: Create a new formatted block for each article/post. Do not merge them.
+    2. LANGUAGE: The entire output MUST be in French.
+    3. TONALITÉ FORMAT: Strictly one word.
     """
     
-    user_prompt = f"Here is the raw data collected for the search query '{figure_name}':\n{raw_text}"
+    # 1. SPLIT THE RAW TEXT INTO INDIVIDUAL BLOCKS
+    # This prevents the AI from hitting the output limit
+    blocks = raw_text.split("[PLATFORM:")
+    # Re-add the split string and remove empty spaces
+    blocks = ["[PLATFORM:" + b for b in blocks if b.strip()]
+    
+    if not blocks:
+        return f"Aucune actualité pertinente trouvée pour '{figure_name}'."
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3 # Slightly raised to 0.3 so it has enough creativity to "guess" realistic view numbers for websites
-        )
+    # 2. GROUP INTO BATCHES OF 8 SOURCES
+    batch_size = 8
+    batches = ["\n\n".join(blocks[i:i + batch_size]) for i in range(0, len(blocks), batch_size)]
+    
+    logging.info(f"Total sources found: {len(blocks)}. Processing in {len(batches)} batches...")
+
+    # 3. PROCESS BATCHES CONCURRENTLY
+    # This stitches all the AI outputs back together smoothly
+    final_results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # executor.map ensures the results stay in the correct order
+        results = list(executor.map(lambda b: process_batch(figure_name, b, system_prompt), batches))
         
-        result = response.choices[0].message.content.strip()
-        
-        if not result or len(result) < 10:
-            return f"No highly relevant detailed news found for '{figure_name}' in the processed articles."
-            
-        return result
-        
-    except Exception as e:
-        logging.error(f"AI Error: {e}")
-        return "Error generating detailed summary."
+        for res in results:
+            if res and len(res) > 10:
+                final_results.append(res)
+
+    if not final_results:
+         return f"Aucune actualité pertinente trouvée pour '{figure_name}' dans les articles traités."
+
+    # 4. RETURN THE MASSIVE STITCHED DASHBOARD
+    return "\n\n".join(final_results)
