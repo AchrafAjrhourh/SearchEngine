@@ -27,7 +27,7 @@ def summarize_news(figure_name, figure_id, raw_text):
     current_date = datetime.now().strftime("%Y-%m-%d")
     
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
-    Your goal is to provide a briefing in French for the provided sources. No matter what language the original source is in, translate and summarize everything into French.
+    Your goal is to provide an executive intelligence briefing in French for the provided sources.
     
     ### ⚠️ RELEVANCE HANDLING (DO NOT SKIP ANY SOURCE):
     The user explicitly wants to see EVERY single website that was extracted, even the irrelevant ones (like football matches where the target is only mentioned in a sidebar). 
@@ -41,9 +41,9 @@ def summarize_news(figure_name, figure_id, raw_text):
     ### OUTPUT FORMAT:
     For EACH source, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
     
-    **Source:** [Insert the raw, plain-text URL here so it can be easily copied]
+    [Insert the raw, plain-text URL here]
     
-    **ID:** {figure_id}
+    **Compte:** {figure_id}
     
     **Tonalité:** [MUST be exactly ONE word in French: Positive, Négative, or Neutre. No explanations.]
     
@@ -51,6 +51,12 @@ def summarize_news(figure_name, figure_id, raw_text):
     - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A" (meaning it is a standard web article), you MUST ESTIMATE the traffic based on the publisher's notoriety. The number MUST be in the thousands. Output it like this: "Moyenne (~12 500 Vues estimées)".
     
     **Thématique:** [Provide the summary as instructed above. ALL TEXT MUST BE IN FRENCH.]
+    
+    **Niveau de Risque:** [Assess the political/PR risk: 🟢 Faible, 🟡 Modéré, or 🔴 Élevé]
+    
+    **Action:** [Provide a short recommendation, e.g., "Aucune action requise (Bruit normal)", "À ignorer (Mention secondaire)", "À surveiller", "Nécessite une réponse", etc.]
+    
+    **Catégorisation:** [Provide 1 or 2 keywords classifying the context, e.g., Institutionnel, Gouvernement, Justice, Sport, Scandale, Vie de Parti, etc.]
     
     ---
     
