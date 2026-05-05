@@ -5,6 +5,7 @@ import os
 from config import setup_logging
 from extractor import execute_deep_social_extraction
 from summarizer import summarize_news
+from st_copy_to_clipboard import st_copy_to_clipboard  # <-- NEW IMPORT
 
 # Initialize background terminal logging
 setup_logging()
@@ -65,25 +66,21 @@ if st.button("Generate Briefing"):
     if not target_keywords:
         st.error("Veuillez entrer ou sélectionner un nom.")
     else:
-        # Create the final composite ID (e.g. MB-RS or PAM-PE)
         composite_id = f"{entity_id}-{scope_id}"
-        
         st.session_state.last_searched = f"{display_name}_{scope_id}"
         st.session_state.final_report = None 
         
         with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
-            # Pass the scope_id to the extractor!
             data = execute_deep_social_extraction(target_keywords, scope_id)
             
             if data:
                 with st.spinner("🧠 IA en cours de synthèse (Génération du rapport)..."):
-                    # Pass the composite ID to the summarizer!
                     report = summarize_news(display_name, composite_id, data)
                     st.session_state.final_report = report
             else:
                 st.session_state.final_report = "EMPTY"
 
-# --- PERSISTENT DISPLAY & WHATSAPP EXPORT ---
+# --- PERSISTENT DISPLAY & 1-CLICK WHATSAPP EXPORT ---
 if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
     if st.session_state.final_report == "EMPTY":
         st.warning(f"Aucune donnée trouvée pour '{display_name}' dans la catégorie {scope_id}.")
@@ -94,19 +91,16 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
         # Split the massive AI string into individual blocks using the horizontal rule
         blocks = st.session_state.final_report.split("---")
         
-        for block in blocks:
+        for idx, block in enumerate(blocks):
             clean_block = block.strip()
             if clean_block:
                 # 1. Show the beautiful rendered UI text
                 st.markdown(clean_block)
                 
-                # 2. Format for WhatsApp (Convert **bold** to *bold*)
+                # 2. Format for WhatsApp (Convert Markdown **bold** to WhatsApp *bold*)
                 whatsapp_ready_text = clean_block.replace("**", "*")
                 
-                # 3. Create the Copy Box
-                with st.expander("📋 Copier pour WhatsApp"):
-                    st.info("Cliquez sur l'icône de copie en haut à droite du bloc ci-dessous ↗️")
-                    st.code(whatsapp_ready_text, language="markdown")
+                # 3. The Magic 1-Click Copy Button
+                st_copy_to_clipboard(whatsapp_ready_text, text="📋 Copier pour WhatsApp", key=f"copy_btn_{idx}")
                 
-                # Add visual separation between the next news item
                 st.markdown("---")
