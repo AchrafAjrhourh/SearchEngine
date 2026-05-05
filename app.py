@@ -1,7 +1,7 @@
 import streamlit as st
 import logging
 from config import setup_logging
-from extractor import fetch_real_news
+from extractor import execute_deep_social_extraction
 from summarizer import summarize_news
 
 # Initialize background terminal logging
@@ -29,8 +29,10 @@ if st.button("Generate Briefing"):
     if figure_name.strip() == "":
         st.error("Please enter a name.")
     else:
-        with st.spinner(f"🔍 Searching for '{figure_name}'..."):
-            live_data = fetch_real_news(figure_name)
+        # Step 1: Data Extraction
+        with st.spinner(f"🔍 Deploying OSINT extractors across YouTube, X, and Telegram for '{figure_name}'..."):
+            # Call the new async wrapper
+            live_data = execute_deep_social_extraction(figure_name)
         
         if live_data:
             with st.spinner(f"🧠 AI is synthesizing the articles into {output_language}..."):
