@@ -83,10 +83,30 @@ if st.button("Generate Briefing"):
             else:
                 st.session_state.final_report = "EMPTY"
 
-# --- PERSISTENT DISPLAY ---
+# --- PERSISTENT DISPLAY & WHATSAPP EXPORT ---
 if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
     if st.session_state.final_report == "EMPTY":
         st.warning(f"Aucune donnée trouvée pour '{display_name}' dans la catégorie {scope_id}.")
     elif st.session_state.final_report:
         st.success(f"✅ Briefing Complete! (Filtre: {scope_id})")
-        st.markdown(st.session_state.final_report)
+        st.markdown("---")
+        
+        # Split the massive AI string into individual blocks using the horizontal rule
+        blocks = st.session_state.final_report.split("---")
+        
+        for block in blocks:
+            clean_block = block.strip()
+            if clean_block:
+                # 1. Show the beautiful rendered UI text
+                st.markdown(clean_block)
+                
+                # 2. Format for WhatsApp (Convert **bold** to *bold*)
+                whatsapp_ready_text = clean_block.replace("**", "*")
+                
+                # 3. Create the Copy Box
+                with st.expander("📋 Copier pour WhatsApp"):
+                    st.info("Cliquez sur l'icône de copie en haut à droite du bloc ci-dessous ↗️")
+                    st.code(whatsapp_ready_text, language="markdown")
+                
+                # Add visual separation between the next news item
+                st.markdown("---")
