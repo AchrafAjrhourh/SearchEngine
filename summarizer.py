@@ -29,18 +29,17 @@ def summarize_news(figure_name, figure_id, raw_text):
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
     Your goal is to provide a briefing in French for the provided sources. No matter what language the original source is in, translate and summarize everything into French.
     
-    ### 🛑 RELEVANCE FILTERING (CRITICAL):
-    You must act as a strict Editor-in-Chief. Many news websites include the target's name ("{figure_name}") in sidebars, "read more" widgets, or ads. 
-    - If the MAIN SUBJECT of the article is an unrelated topic (e.g., a football match, a foreign event, unrelated general news) and the target is just mentioned in passing or in a sidebar, you MUST SKIP IT ENTIRELY. Do not output a block for it.
-    - If it is a social media post that doesn't actually talk about the figure, SKIP IT.
-    
-    ### 🟢 ANTI-SCRAPING EXCEPTION (DO NOT SKIP THESE):
-    If a source is very short (e.g., just a Title or a 1-sentence snippet), but that specific title/snippet IS directly about "{figure_name}", you MUST PROCESS IT and write a 1-sentence summary. Do not skip valid news just because it is short.
+    ### ⚠️ RELEVANCE HANDLING (DO NOT SKIP ANY SOURCE):
+    The user explicitly wants to see EVERY single website that was extracted, even the irrelevant ones (like football matches where the target is only mentioned in a sidebar). 
+    - You MUST NOT SKIP ANY SOURCE. Output a block for every single item in the batch.
+    - If the article is highly relevant, write a normal 3-5 sentence summary.
+    - If the article is IRRELEVANT (e.g., sports, foreign events, general news), summarize the article anyway, but start your Thématique with "[Mention Secondaire]" to indicate to the user that the figure's name was just caught in the sidebar noise.
+    - If the source is very short (e.g., just a Title), write a 1-sentence summary based on whatever text is available.
     
     --- 
     
     ### OUTPUT FORMAT:
-    For EACH source that passes the relevance filter, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
+    For EACH source, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
     
     **Source:** [Insert the raw, plain-text URL here so it can be easily copied]
     
@@ -51,12 +50,12 @@ def summarize_news(figure_name, figure_id, raw_text):
     **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)".
     - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A" (meaning it is a standard web article), you MUST ESTIMATE the traffic based on the publisher's notoriety. The number MUST be in the thousands. Output it like this: "Moyenne (~12 500 Vues estimées)".
     
-    **Thématique:** [Provide a summary. If it's a detailed article, write 3-5 sentences. If it's very short, write a 1-sentence summary based on whatever text is available. ALL TEXT MUST BE IN FRENCH.]
+    **Thématique:** [Provide the summary as instructed above. ALL TEXT MUST BE IN FRENCH.]
     
     ---
     
     STRICT RULES:
-    1. INDEPENDENT SECTIONS: Create a new formatted block for EVERY valid source.
+    1. INDEPENDENT SECTIONS: Create a new formatted block for EVERY single source in the batch. Do not skip or merge.
     2. LANGUAGE: The entire output MUST be in French.
     3. TONALITÉ FORMAT: Strictly one word.
     """
