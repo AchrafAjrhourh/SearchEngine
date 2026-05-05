@@ -22,7 +22,9 @@ YT_API_KEY = os.getenv("YOUTUBE_API_KEY")
 RAPID_API_KEY = os.getenv("RAPIDAPI_KEY")
 RAPID_HOST_IG = os.getenv("RAPIDAPI_HOST_INSTAGRAM")
 RAPID_HOST_FB = os.getenv("RAPIDAPI_HOST_FACEBOOK")
-RAPID_HOST_GOOGLE = os.getenv("RAPIDAPI_HOST_GOOGLE", "google-search-master-mega.p.rapidapi.com")
+RAPID_HOST_GOOGLE = os.getenv("RAPIDAPI_HOST_GOOGLE")
+RAPID_HOST_TWITTER = os.getenv("RAPIDAPI_HOST_TWITTER")
+RAPID_HOST_TIKTOK = os.getenv("RAPIDAPI_HOST_TIKTOK")
 
 def is_arabic(text):
     return bool(re.search(r'[\u0600-\u06FF]', text))
@@ -245,6 +247,96 @@ class EliteOSINTExtractor:
                     self._append_payload("Facebook", text, post.get('url'), f"{post.get('reactions_count', 0)} Réactions", f"{post.get('reshare_count', 0)} Partages")
             except Exception as e:
                 print(f"❌ Facebook Error: {e}")
+
+    # =========================================================
+    # 6. X (TWITTER) (RS ONLY)
+    # =========================================================
+    async def fetch_twitter(self):
+        if not RAPID_API_KEY or self.result_count >= self.max_results: return
+        search_url = f"https://{RAPID_HOST_TWITTER}/search.php"
+        headers = {"x-rapidapi-key": RAPID_API_KEY, "x-rapidapi-host": RAPID_HOST_TWITTER}
+        
+        for kw in self.keywords[:2]:
+            if self.result_count >= self.max_results: break
+            params = {"query": f'"{kw}"', "search_type": "Latest"}
+            try:
+                print(f"⏳ Calling X (Twitter) for '{kw}'...")
+                response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
+                tweets = response.json().get('timeline', [])
+                
+                if not tweets:
+                    print(f"⚠️ No X (Twitter) posts found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(tweets)} X (Twitter) posts for '{kw}'.")
+
+                for tweet in tweets:
+                    if self.result_count >= self.max_results: break
+                    if tweet.get('type') != 'tweet': continue
+                    
+                    text = tweet.get('text', '')
+                    if not text: continue
+                    
+                    # Optional 48h Time check
+                    try:
+                        created_at = datetime.strptime(tweet.get('created_at'), "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
+                        if created_at < FORTY_EIGHT_HOURS_AGO: continue
+                    except:
+                        pass # If parsing fails, rely on 'Latest' API parameter
+                    
+                    tweet_id = tweet.get('tweet_id')
+                    screen_name = tweet.get('user_info', {}).get('screen_name', 'i')
+                    url = f"https://x.com/{screen_name}/status/{tweet_id}"
+                    
+                    likes = tweet.get('favorites', 0)
+                    retweets = tweet.get('retweets', 0)
+                    views = tweet.get('views', '0')
+                    
+                    self._append_payload("X (Twitter)", text, url, f"{likes} Likes, {retweets} Reposts", f"{views} Vues")
+            except Exception as e:
+                print(f"❌ X (Twitter) Error: {e}")
+
+    # =========================================================
+    # 7. TIKTOK (RS ONLY)
+    # =========================================================
+    async def fetch_tiktok(self):
+        if not RAPID_API_KEY or self.result_count >= self.max_results: return
+        search_url = f"https://{RAPID_HOST_TIKTOK}/api/search/video"
+        headers = {"x-rapidapi-key": RAPID_API_KEY, "x-rapidapi-host": RAPID_HOST_TIKTOK}
+        
+        for kw in self.keywords[:2]:
+            if self.result_count >= self.max_results: break
+            # Base parameters per API documentation
+            params = {"keyword": kw, "cursor": "0", "search_id": "0"}
+            try:
+                print(f"⏳ Calling TikTok for '{kw}'...")
+                response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
+                videos = response.json().get('item_list', [])
+                
+                if not videos:
+                    print(f"⚠️ No TikTok videos found for '{kw}'.")
+                else:
+                    print(f"✅ Found {len(videos)} TikTok videos for '{kw}'.")
+
+                for video in videos:
+                    if self.result_count >= self.max_results: break
+                    
+                    # 48h Time Filter
+                    create_time = video.get('createTime', 0)
+                    if create_time > 0 and create_time < UNIX_48H_AGO: continue
+                    
+                    text = video.get('desc', 'Vidéo TikTok')
+                    video_id = video.get('id')
+                    author_id = video.get('author', {}).get('uniqueId', '_')
+                    url = f"https://www.tiktok.com/@{author_id}/video/{video_id}"
+                    
+                    stats = video.get('stats', {})
+                    likes = stats.get('diggCount', 0)
+                    comments = stats.get('commentCount', 0)
+                    views = stats.get('playCount', 0)
+                    
+                    self._append_payload("TikTok", text, url, f"{likes} Likes, {comments} Commentaires", f"{views} Vues")
+            except Exception as e:
+                print(f"❌ TikTok Error: {e}")
 
     # =========================================================
     # DYNAMIC ORCHESTRATOR
