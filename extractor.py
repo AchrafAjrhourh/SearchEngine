@@ -13,9 +13,14 @@ load_dotenv()
 
 # --- CONSTANTS & CONFIG (48 HOURS) ---
 NOW = datetime.now(timezone.utc)
-FORTY_EIGHT_HOURS_AGO = NOW - timedelta(days=2)
-UNIX_48H_AGO = int(FORTY_EIGHT_HOURS_AGO.timestamp())
-ISO_48H_AGO = FORTY_EIGHT_HOURS_AGO.isoformat()
+
+# # FORTY_EIGHT_HOURS_AGO = NOW - timedelta(days=2)
+# UNIX_48H_AGO = int(FORTY_EIGHT_HOURS_AGO.timestamp())
+# ISO_48H_AGO = FORTY_EIGHT_HOURS_AGO.isoformat()
+
+TWELVE_HOURS_AGO = NOW - timedelta(hours=12)
+UNIX_12H_AGO = int(TWELVE_HOURS_AGO.timestamp())
+ISO_12H_AGO = TWELVE_HOURS_AGO.isoformat()
 
 # Keys
 YT_API_KEY = os.getenv("YOUTUBE_API_KEY")
@@ -87,10 +92,15 @@ class EliteOSINTExtractor:
             if self.result_count >= self.max_results: break
             
             encoded_query = urllib.parse.quote(f'"{kw}"')
+            # if is_arabic(kw):
+            #     rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
+            # else:
+            #     rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=fr&gl=MA&ceid=MA:fr"
+
             if is_arabic(kw):
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=ar&gl=MA&ceid=MA:ar"
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:12h&hl=ar&gl=MA&ceid=MA:ar"
             else:
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:2d&hl=fr&gl=MA&ceid=MA:fr"
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:12h&hl=fr&gl=MA&ceid=MA:fr"
 
             try:
                 self.log(f"⏳ Calling RSS News for: '{kw}'...")
@@ -145,7 +155,10 @@ class EliteOSINTExtractor:
                 
                 self.log(f"⏳ Calling Google Mega Search | Dork: {dork[:50]}...")
                 
-                params = {"q": dork, "gl": "ma", "hl": lang, "tbs": "sbd:1,qdr:d2", "autocorrect": "true", "num": "15", "page": "1"}
+                # params = {"q": dork, "gl": "ma", "hl": lang, "tbs": "sbd:1,qdr:d2", "autocorrect": "true", "num": "15", "page": "1"}
+
+                params = {"q": dork, "gl": "ma", "hl": lang, "tbs": "sbd:1,qdr:h12", "autocorrect": "true", "num": "15", "page": "1"}
+
                 resp = await asyncio.to_thread(requests.get, url, headers=headers, params=params)
                 
                 # --- API HEALTH/QUOTA CHECK ---
@@ -186,7 +199,10 @@ class EliteOSINTExtractor:
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
             query = urllib.parse.quote(f'"{kw}"')
-            url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_48H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=25"
+            # url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_48H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=25"
+
+            url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&publishedAfter={ISO_12H_AGO.replace('+00:00', 'Z')}&type=video&key={YT_API_KEY}&maxResults=25"
+
             try:
                 self.log(f"⏳ Calling YouTube API for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, url)
@@ -241,7 +257,8 @@ class EliteOSINTExtractor:
             for edge in edges:
                 if self.result_count >= self.max_results: break
                 node = edge.get('node', {})
-                if node.get('taken_at_timestamp', 0) < UNIX_48H_AGO: continue 
+                # if node.get('taken_at_timestamp', 0) < UNIX_48H_AGO: continue 
+                if node.get('taken_at_timestamp', 0) < UNIX_12H_AGO: continue
                 url = f"https://www.instagram.com/p/{node.get('shortcode')}/"
                 cap = node.get('edge_media_to_caption', {}).get('edges', [{}])[0].get('node', {}).get('text', 'IG Post')
                 self._append_payload("Instagram", cap, url, f"{node.get('edge_liked_by', {}).get('count', 0)} Likes", "N/A")
@@ -258,7 +275,10 @@ class EliteOSINTExtractor:
         
         for kw in self.keywords[:2]:
             if self.result_count >= self.max_results: break
-            params = {"query": f'"{kw}"', "recent_posts": "true", "start_date": FORTY_EIGHT_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
+            # params = {"query": f'"{kw}"', "recent_posts": "true", "start_date": FORTY_EIGHT_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
+
+            params = {"query": f'"{kw}"', "recent_posts": "true", "start_date": TWELVE_HOURS_AGO.strftime('%Y-%m-%d'), "end_date": NOW.strftime('%Y-%m-%d')}
+
             try:
                 self.log(f"⏳ Calling Facebook for '{kw}'...")
                 response = await asyncio.to_thread(requests.get, search_url, headers=headers, params=params)
@@ -323,14 +343,16 @@ class EliteOSINTExtractor:
                     text = tweet.get('text', '')
                     if not text: continue
                     
-                    # 2. Check the 48-hour rule
+                    # 2. Check the 12-hour rule with Strict Debugging
                     try:
-                        created_at = datetime.strptime(tweet.get('created_at'), "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
-                        if created_at < FORTY_EIGHT_HOURS_AGO: 
-                            self.log("     ❌ Skipped: Plus vieux que 48 heures")
+                        tweet_date_str = tweet.get('created_at', '')
+                        created_at = datetime.strptime(tweet_date_str, "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
+                        if created_at < TWELVE_HOURS_AGO:
+                            self.log("     ❌ Skipped: Plus vieux que 12 heures")
                             continue
-                    except:
-                        pass 
+                    except Exception as time_err:
+                        self.log(f"     ⚠️ Impossible de parser l'heure X/Twitter (Bypass) : {time_err}")
+                        continue 
                     
                     likes = tweet.get('favorites', 0)
                     retweets = tweet.get('retweets', 0)
@@ -378,10 +400,14 @@ class EliteOSINTExtractor:
                     
                     # 2. Check the 48-hour rule
                     create_time = video.get('createTime', 0)
-                    if create_time > 0 and create_time < UNIX_48H_AGO: 
-                        self.log("     ❌ Skipped: Plus vieux que 48 heures")
+                    # if create_time > 0 and create_time < UNIX_48H_AGO: 
+                    #     self.log("     ❌ Skipped: Plus vieux que 48 heures")
+                    #     continue
+
+                    if create_time > 0 and create_time < UNIX_12H_AGO:
+                        self.log("     ❌ Skipped: Plus vieux que 12 heures")
                         continue
-                    
+
                     text = video.get('desc', 'Vidéo TikTok')
                     stats = video.get('stats', {})
                     likes = stats.get('diggCount', 0)
