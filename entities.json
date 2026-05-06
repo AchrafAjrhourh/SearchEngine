@@ -2,7 +2,7 @@
     "entities": {
         "PAM (Parti de l'Authenticité et de la Modernité)": {
             "id": "PAM",
-            "keywords": ["الأصالة والمعاصرة", "حزب الأصالة والمعاصرة", "Parti authenticité et modernité"]
+            "keywords": ["الأصالة والمعاصرة", "حزب الأصالة والمعاصرة", "Parti authenticité et modernité", "Assala w Mou3assara"]
         },
         "Fatima Zahra Mansouri": {
             "id": "FZM",
@@ -42,7 +42,7 @@
         },
         "Said Naciri": {
             "id": "SNA",
-            "keywords": ["Said Naciri", "سعيد الناصري"]
+            "keywords": ["Acteur Said Naciri", " الممثل سعيد الناصري", "humoriste Saïd Naciri"]
         },
         "Abdelkader Salama": {
             "id": "ASA",
@@ -120,5 +120,15 @@
     "scopes": {
         "Social Media": "RS",
         "Politics (News & Web)": "PE"
-    }
+    },
+    "modifiers": [
+        "HB Hassan", "شؤون سياسية | Affaires politiques", "رصيف24", "جمهور عبد الإله ابن كيران",
+        "Aarab News", "Marocnews مغربية نيوز", "Alfadeha", "Mahdaoui", "Voice Of Morocco",
+        "القلم الأحمر", "Samadi Abouhiba", "عبداللطيف سودو", "alyaoum24", "رصد المغربية | Rassd Maroc",
+        "حُراس الفضيلة", "حليمة الشويكة", "alakhbar24.me", "ملاحظة Molahada", "Hassan Bouikhif",
+        "Mohssen Moufidi", "Hashtag.ma", "Anmo9ar Press", "Crash Siyasi - كراش سياسي",
+        "Soulaiman Raissouni", "Saada Boussif", "SafirCom", "تربويات اليوم", "محمد أمحجور",
+        "إبراهيم حليم", "رصد الشعب | Ra'sd Cha3B", "عبد العزيز بن صالح", "من زرع حصد",
+        "حزب الشعب", "عبد الخالق محب", "Guercif HD73 Tma9ant"
+    ]
 }
