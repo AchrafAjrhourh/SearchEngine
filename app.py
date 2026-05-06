@@ -29,6 +29,7 @@ with open("entities.json", "r", encoding="utf-8") as f:
     config_data = json.load(f)
     ENTITIES = config_data.get("entities", {})
     SCOPES = config_data.get("scopes", {})
+    MODIFIERS = config_data.get("modifiers", []) # <-- NEW
 
 # --- WEB PAGE CONFIGURATION ---
 st.set_page_config(page_title="Global News Aggregator", page_icon="🌍", layout="centered")
@@ -87,7 +88,8 @@ if st.button("Generate Briefing"):
             log_container.code("\n".join(log_messages))
 
         with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
-            data = execute_deep_social_extraction(target_keywords, scope_id, log_callback=update_log)
+            # We now pass the MODIFIERS list to the extractor!
+            data = execute_deep_social_extraction(target_keywords, scope_id, MODIFIERS, log_callback=update_log)
             
             if data:
                 with st.spinner("🧠 IA en cours de synthèse..."):
