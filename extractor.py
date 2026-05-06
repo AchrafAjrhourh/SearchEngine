@@ -32,21 +32,23 @@ def is_arabic(text):
     return bool(re.search(r'[\u0600-\u06FF]', text))
 
 class EliteOSINTExtractor:
-    def __init__(self, keywords_list, scope_id, log_callback=None): # Added log_callback
+    def __init__(self, keywords_list, scope_id, log_callback=None): 
         self.keywords = keywords_list
         self.scope_id = scope_id
-        self.log_callback = log_callback # Save the callback
+        self.log_callback = log_callback 
         self.main_kw = keywords_list[0] if keywords_list else ""
         
         self.aggregated_data = ""
         self.result_count = 0  
-        self.max_results = 50  
+        
+        # --- THE FIX: 15 max for Web/News, 50 max for Social Media ---
+        self.max_results = 15 if self.scope_id == "PE" else 50  
 
     # Helper to print to terminal AND Streamlit UI
     def log(self, message):
-        print(message) # Keep terminal logs
+        print(message) 
         if self.log_callback:
-            self.log_callback(message) # Send to Dashboard
+            self.log_callback(message)
 
     def _append_payload(self, platform, content, url, interactions, reach):
         if self.result_count >= self.max_results: return False
