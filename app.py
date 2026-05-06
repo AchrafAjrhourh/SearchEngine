@@ -70,15 +70,29 @@ if st.button("Generate Briefing"):
         st.session_state.last_searched = f"{display_name}_{scope_id}"
         st.session_state.final_report = None 
         
-        with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
-            data = execute_deep_social_extraction(target_keywords, scope_id)
+        # 1. Create a "Terminal" placeholder
+        log_container = st.empty()
+        log_messages = []
+
+        # 2. Define the callback function to update the UI
+        def update_log(msg):
+            log_messages.append(msg)
+            # Display logs as a code block to look like a terminal
+            log_container.code("\n".join(log_messages))
+
+        with st.spinner(f"🔍 Déploiement des extracteurs..."):
+            # 3. Pass the update_log function to the extractor
+            data = execute_deep_social_extraction(target_keywords, scope_id, log_callback=update_log)
             
             if data:
-                with st.spinner("🧠 IA en cours de synthèse (Génération du rapport)..."):
+                with st.spinner("🧠 IA en cours de synthèse..."):
                     report = summarize_news(display_name, composite_id, data)
                     st.session_state.final_report = report
             else:
                 st.session_state.final_report = "EMPTY"
+
+        # 4. CRITICAL: Clear the logs once finished
+        log_container.empty()
 
 # --- PERSISTENT DISPLAY & 1-CLICK WHATSAPP EXPORT ---
 if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
