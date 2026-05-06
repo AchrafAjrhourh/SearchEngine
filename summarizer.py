@@ -27,7 +27,7 @@ def summarize_news(figure_name, figure_id, raw_text):
     current_date = datetime.now().strftime("%Y-%m-%d")
     
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
-    Your goal is to provide an executive intelligence briefing in French for the provided sources.
+    Your goal is to provide a highly detailed executive intelligence briefing in French for the provided sources.
     
     ### 🛑 STRICT RELEVANCE FILTERING (CRITICAL):
     You must act as a ruthless Editor-in-Chief. You MUST DELETE AND SKIP the following types of content (Do NOT output a block for them):
@@ -35,7 +35,7 @@ def summarize_news(figure_name, figure_id, raw_text):
     2. Empty/Vague Social Media: If a post or video has no actual content or context (e.g., "La vidéo date du 4 mai, mais aucun contenu spécifique n'est mentionné" or it's just random hashtags without meaning), SKIP IT ENTIRELY.
     
     ### 🟢 ANTI-SCRAPING EXCEPTION (Keep these):
-    If a source is very short (e.g., just a Title) BUT the title itself is explicitly and primarily about "{figure_name}", you MUST PROCESS IT and write a 1-sentence summary.
+    If a source is very short (e.g., just a Title) BUT the title itself is explicitly and primarily about "{figure_name}", you MUST PROCESS IT.
     
     --- 
     
@@ -49,9 +49,9 @@ def summarize_news(figure_name, figure_id, raw_text):
     **Tonalité:** [MUST be exactly ONE word in French: Positive, Négative, or Neutre. No explanations.]
     
     **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)".
-    - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A" (meaning it is a standard web article), you MUST ESTIMATE the traffic based on the publisher's notoriety. The number MUST be in the thousands. Output it like this: "Moyenne (~12 500 Vues estimées)".
+    - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A", you MUST ESTIMATE the traffic based on the publisher's notoriety. Example: "Moyenne (~12 500 Vues estimées)".
     
-    **Thématique:** [Provide a concise summary. ALL TEXT MUST BE IN FRENCH.]
+    **Thématique:** [CRITICAL: You MUST write a DETAILED and IN-DEPTH paragraph of at least 4 to 6 sentences. Thoroughly explain the context, the core message, what the figure is doing, and the implications. DO NOT be brief! If the source is just a title, write 2 detailed sentences based on it. ALL TEXT MUST BE IN FRENCH.]
     
     **Niveau de Risque:** [Assess the political/PR risk: 🟢 Faible, 🟡 Modéré, or 🔴 Élevé]
     
@@ -65,6 +65,7 @@ def summarize_news(figure_name, figure_id, raw_text):
     1. INDEPENDENT SECTIONS: Create a new formatted block ONLY for relevant sources.
     2. LANGUAGE: The entire output MUST be in French.
     3. TONALITÉ FORMAT: Strictly one word.
+    4. THÉMATIQUE LENGTH: Must be detailed and comprehensive (4-6 sentences minimum).
     """
     
     blocks = raw_text.split("[PLATFORM:")
