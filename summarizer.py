@@ -29,17 +29,18 @@ def summarize_news(figure_name, figure_id, raw_text):
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
     Your goal is to provide an executive intelligence briefing in French for the provided sources.
     
-    ### ⚠️ RELEVANCE HANDLING (DO NOT SKIP ANY SOURCE):
-    The user explicitly wants to see EVERY single website that was extracted, even the irrelevant ones (like football matches where the target is only mentioned in a sidebar). 
-    - You MUST NOT SKIP ANY SOURCE. Output a block for every single item in the batch.
-    - If the article is highly relevant, write a normal 3-5 sentence summary.
-    - If the article is IRRELEVANT (e.g., sports, foreign events, general news), summarize the article anyway, but start your Thématique with "[Mention Secondaire]" to indicate to the user that the figure's name was just caught in the sidebar noise.
-    - If the source is very short (e.g., just a Title), write a 1-sentence summary based on whatever text is available.
+    ### 🛑 STRICT RELEVANCE FILTERING (CRITICAL):
+    You must act as a ruthless Editor-in-Chief. You MUST DELETE AND SKIP the following types of content (Do NOT output a block for them):
+    1. "Sidebar Noise" / Passing Mentions: If the MAIN SUBJECT is an unrelated topic (e.g., a football match, a foreign event, Minurso/Sahara general news) and the target is just caught in a sidebar or mentioned briefly, SKIP IT ENTIRELY.
+    2. Empty/Vague Social Media: If a post or video has no actual content or context (e.g., "La vidéo date du 4 mai, mais aucun contenu spécifique n'est mentionné" or it's just random hashtags without meaning), SKIP IT ENTIRELY.
+    
+    ### 🟢 ANTI-SCRAPING EXCEPTION (Keep these):
+    If a source is very short (e.g., just a Title) BUT the title itself is explicitly and primarily about "{figure_name}", you MUST PROCESS IT and write a 1-sentence summary.
     
     --- 
     
     ### OUTPUT FORMAT:
-    For EACH source, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
+    For EACH source that passes the strict relevance filter, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
     
     [Insert the raw, plain-text URL here]
     
@@ -50,18 +51,18 @@ def summarize_news(figure_name, figure_id, raw_text):
     **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)".
     - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A" (meaning it is a standard web article), you MUST ESTIMATE the traffic based on the publisher's notoriety. The number MUST be in the thousands. Output it like this: "Moyenne (~12 500 Vues estimées)".
     
-    **Thématique:** [Provide the summary as instructed above. ALL TEXT MUST BE IN FRENCH.]
+    **Thématique:** [Provide a concise summary. ALL TEXT MUST BE IN FRENCH.]
     
     **Niveau de Risque:** [Assess the political/PR risk: 🟢 Faible, 🟡 Modéré, or 🔴 Élevé]
     
-    **Action:** [Provide a short recommendation, e.g., "Aucune action requise (Bruit normal)", "À ignorer (Mention secondaire)", "À surveiller", "Nécessite une réponse", etc.]
+    **Action:** [Provide a short recommendation, e.g., "Aucune action requise (Bruit normal)", "À surveiller", "Nécessite une réponse", etc.]
     
     **Catégorisation:** [Provide 1 or 2 keywords classifying the context, e.g., Institutionnel, Gouvernement, Justice, Sport, Scandale, Vie de Parti, etc.]
     
     ---
     
     STRICT RULES:
-    1. INDEPENDENT SECTIONS: Create a new formatted block for EVERY single source in the batch. Do not skip or merge.
+    1. INDEPENDENT SECTIONS: Create a new formatted block ONLY for relevant sources.
     2. LANGUAGE: The entire output MUST be in French.
     3. TONALITÉ FORMAT: Strictly one word.
     """
@@ -86,6 +87,6 @@ def summarize_news(figure_name, figure_id, raw_text):
                 final_results.append(res)
 
     if not final_results:
-         return f"Aucune actualité trouvée pour '{figure_name}' dans les articles traités."
+         return f"Aucune actualité pertinente trouvée pour '{figure_name}' dans les articles traités."
 
     return "\n\n".join(final_results)
