@@ -42,6 +42,10 @@ if "last_searched" not in st.session_state:
     st.session_state.last_searched = ""
 if "final_report" not in st.session_state:
     st.session_state.final_report = None
+if "docx_data" not in st.session_state:
+    st.session_state.docx_data = None
+if "pdf_data" not in st.session_state:
+    st.session_state.pdf_data = None
 
 # --- USER INPUT ---
 col1, col2 = st.columns(2)
@@ -82,14 +86,17 @@ if st.button("Generate Briefing"):
             # Display logs as a code block to look like a terminal
             log_container.code("\n".join(log_messages))
 
-        with st.spinner(f"🔍 Déploiement des extracteurs..."):
-            # 3. Pass the update_log function to the extractor
+        with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
             data = execute_deep_social_extraction(target_keywords, scope_id, log_callback=update_log)
             
             if data:
                 with st.spinner("🧠 IA en cours de synthèse..."):
                     report = summarize_news(display_name, composite_id, data)
                     st.session_state.final_report = report
+                    
+                    # 🚀 MOBILE FIX: Generate files exactly ONCE and store them in memory!
+                    st.session_state.docx_data = generate_docx(report, display_name)
+                    st.session_state.pdf_data = generate_pdf(report, display_name)
             else:
                 st.session_state.final_report = "EMPTY"
 
@@ -104,28 +111,28 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
         st.success(f"✅ Briefing Complete! (Filtre: {scope_id})")
         
         # ==========================================
-        # ⬇️ THE NEW EXPORT BUTTONS ⬇️
+        # ⬇️ THE NEW EXPORT BUTTONS (MOBILE OPTIMIZED) ⬇️
         # ==========================================
         st.markdown("### 📥 Exporter le Rapport")
         col_docx, col_pdf = st.columns(2)
         
         with col_docx:
-            docx_data = generate_docx(st.session_state.final_report, display_name)
-            st.download_button(
-                label="📄 Télécharger en DOCX (Word)",
-                data=docx_data,
-                file_name=f"Briefing_{display_name}_{scope_id}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            if st.session_state.docx_data:
+                st.download_button(
+                    label="📄 Télécharger en DOCX",
+                    data=st.session_state.docx_data,
+                    file_name=f"Briefing_{display_name}_{scope_id}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
             
         with col_pdf:
-            pdf_data = generate_pdf(st.session_state.final_report, display_name)
-            st.download_button(
-                label="📕 Télécharger en PDF",
-                data=pdf_data,
-                file_name=f"Briefing_{display_name}_{scope_id}.pdf",
-                mime="application/pdf"
-            )
+            if st.session_state.pdf_data:
+                st.download_button(
+                    label="📕 Télécharger en PDF",
+                    data=st.session_state.pdf_data,
+                    file_name=f"Briefing_{display_name}_{scope_id}.pdf",
+                    mime="application/pdf"
+                )
             
         st.markdown("---")
         # ==========================================
