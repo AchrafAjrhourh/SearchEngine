@@ -2,7 +2,7 @@
     "entities": {
         "PAM (Parti de l'Authenticité et de la Modernité)": {
             "id": "PAM",
-            "keywords": ["pam maroc", "الأصالة والمعاصرة", "حزب الأصالة والمعاصرة", "Parti authenticité et modernité"]
+            "keywords": ["الأصالة والمعاصرة", "حزب الأصالة والمعاصرة", "Parti authenticité et modernité"]
         },
         "Fatima Zahra Mansouri": {
             "id": "FZM",
