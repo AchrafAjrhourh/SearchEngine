@@ -2,10 +2,12 @@ import streamlit as st
 import logging
 import json
 import os
+import re  # <--- ADD THIS HERE
 from config import setup_logging
 from extractor import execute_deep_social_extraction
 from summarizer import summarize_news
-from st_copy_to_clipboard import st_copy_to_clipboard  # <-- NEW IMPORT
+from st_copy_to_clipboard import st_copy_to_clipboard
+from exporter import generate_docx, generate_pdf
 
 # Initialize background terminal logging
 setup_logging()
@@ -94,13 +96,42 @@ if st.button("Generate Briefing"):
         # 4. CRITICAL: Clear the logs once finished
         log_container.empty()
 
-# --- PERSISTENT DISPLAY & 1-CLICK WHATSAPP EXPORT ---
+# --- PERSISTENT DISPLAY & EXPORTS ---
 if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
     if st.session_state.final_report == "EMPTY":
         st.warning(f"Aucune donnée trouvée pour '{display_name}' dans la catégorie {scope_id}.")
     elif st.session_state.final_report:
         st.success(f"✅ Briefing Complete! (Filtre: {scope_id})")
+        
+        # ==========================================
+        # ⬇️ THE NEW EXPORT BUTTONS ⬇️
+        # ==========================================
+        st.markdown("### 📥 Exporter le Rapport")
+        col_docx, col_pdf = st.columns(2)
+        
+        with col_docx:
+            docx_data = generate_docx(st.session_state.final_report, display_name)
+            st.download_button(
+                label="📄 Télécharger en DOCX (Word)",
+                data=docx_data,
+                file_name=f"Briefing_{display_name}_{scope_id}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            
+        with col_pdf:
+            pdf_data = generate_pdf(st.session_state.final_report, display_name)
+            st.download_button(
+                label="📕 Télécharger en PDF",
+                data=pdf_data,
+                file_name=f"Briefing_{display_name}_{scope_id}.pdf",
+                mime="application/pdf"
+            )
+            
         st.markdown("---")
+        # ==========================================
+        
+        # Split the massive AI string into individual blocks using the horizontal rule
+        blocks = st.session_state.final_report.split("---")
         
         # Split the massive AI string into individual blocks using the horizontal rule
         blocks = st.session_state.final_report.split("---")
@@ -108,13 +139,24 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
         for idx, block in enumerate(blocks):
             clean_block = block.strip()
             if clean_block:
-                # 1. Show the beautiful rendered UI text
-                st.markdown(clean_block)
                 
-                # 2. Format for WhatsApp (Convert Markdown **bold** to WhatsApp *bold*)
+                # ==========================================
+                # 🛠️ THE NEW TAB FIX (MOBILE SCROLL SAVER)
+                # ==========================================
+                # This finds the URL and wraps it in HTML so it forces a new tab
+                ui_block = re.sub(
+                    r'(\*\*Source:\*\*\s*)(https?://[^\s]+)', 
+                    r'\1<a href="\2" target="_blank" rel="noopener noreferrer">\2</a>', 
+                    clean_block
+                )
+                
+                # 1. Show the UI text (with HTML enabled for the new tab link)
+                st.markdown(ui_block, unsafe_allow_html=True)
+                
+                # 2. Format for WhatsApp (Using the ORIGINAL block so the URL stays raw for WhatsApp previews!)
                 whatsapp_ready_text = clean_block.replace("**", "*")
                 
-                # 3. The Magic 1-Click Copy Button (Corrected parameters)
+                # 3. The Magic 1-Click Copy Button
                 st_copy_to_clipboard(
                     text=whatsapp_ready_text, 
                     before_copy_label="📋 Copier pour WhatsApp", 
