@@ -31,10 +31,11 @@ class EliteOSINTExtractor:
         
         self.aggregated_data = ""
         self.result_count = 0  
-        self.max_results = 50  # Maxed out as you requested
+        self.max_results = 100  
 
-        # Only use the base keywords
-        self.search_queries = self.keywords[:2]
+        # --- THE FIX: Removed the [:2] limit ---
+        # The engine will now search EVERY keyword listed in your entities.json
+        self.search_queries = self.keywords
 
     def log(self, message):
         print(message) 
@@ -107,7 +108,7 @@ class EliteOSINTExtractor:
                 self.log(f"❌ RSS News Error: {e}")
 
     # =========================================================
-    # 2. GOOGLE WEB SEARCH - VIA SERPER.DEV (MAX YIELD)
+    # 2. GOOGLE WEB SEARCH - SERPER BATCH ENGINE (MAX YIELD)
     # =========================================================
     async def fetch_serper_google(self):
         if not SERPER_API_KEY or self.result_count >= self.max_results: return
@@ -118,66 +119,74 @@ class EliteOSINTExtractor:
             'Content-Type': 'application/json'
         }
         
+        # 1. Build the massive Batch Payload
+        payload = []
         for kw in self.search_queries: 
-            if self.result_count >= self.max_results: break
+            for lang in ["ar", "fr", "en"]:
+                payload.append({
+                    "q": kw,
+                    "gl": "ma",          # Geo-locate to Morocco
+                    "hl": lang,          # Search across Arabic, French, and English indexes
+                    "tbs": "qdr:h12",    # --- THE FIX: Native Google filter for Past 12 hours ---
+                    "num": 100           # MAXIMIZED: Pull top 100 results (DO NOT use 'page')
+                })
+        
+        try:
+            self.log(f"⏳ Calling Serper Batch Engine for {len(self.search_queries)} keywords across 3 languages...")
             
-            lang_code = "ar" if is_arabic(kw) else "fr"
+            # Send the entire list in one single request using json=payload
+            resp = await asyncio.to_thread(requests.post, url, headers=headers, json=payload, timeout=30)
             
-            # --- THE FIX: Maximize Yield ---
-            payload = {
-                "q": kw,             # Removed strict quotes to catch more variations
-                "hl": lang_code,
-                "gl": "ma",          
-                "tbs": "qdr:d",      # Native Google filter for strictly Past 24 hours
-                "num": 100,
-                "page":10           # MAXIMIZED: Pull up to 100 results per request!
-            }
+            if resp.status_code != 200:
+                self.log(f"🚨 API ERROR [Serper]: Code {resp.status_code} -> {resp.text}")
+                return
+                
+            batch_data = resp.json()
             
-            try:
-                self.log(f"⏳ Calling Serper (Google Index) for: '{kw}'...")
+            # 2. Extract and Deduplicate Results
+            all_organic_results = []
+            seen_links = set() # To prevent analyzing the same URL twice
+            
+            # Serper returns a list of dictionaries for batch requests
+            if isinstance(batch_data, list):
+                for query_response in batch_data:
+                    all_organic_results.extend(query_response.get('organic', []))
+            else:
+                all_organic_results.extend(batch_data.get('organic', []))
                 
-                import json
-                resp = await asyncio.to_thread(requests.post, url, headers=headers, data=json.dumps(payload), timeout=15)
-                
-                if resp.status_code != 200:
-                    self.log(f"🚨 API ERROR [Serper]: Code {resp.status_code} -> {resp.text}")
-                    continue
-                    
-                data = resp.json()
-                results = data.get('organic', [])
-                
-                if not results:
-                    self.log(f"⚠️ No Google results found for '{kw}'.")
-                else:
-                    self.log(f"✅ Found {len(results)} Google results for '{kw}'.")
+            if not all_organic_results:
+                self.log(f"⚠️ No Google results found in the batch.")
+            else:
+                self.log(f"✅ Found {len(all_organic_results)} raw Google results. Filtering duplicates...")
 
-                for item in results:
-                    if self.result_count >= self.max_results: break
+            # 3. Process the unique links
+            for item in all_organic_results:
+                if self.result_count >= self.max_results: break
+                
+                link = item.get('link')
+                title = item.get('title', '')
+                
+                # Deduplication check
+                if not link or link in seen_links: continue
+                seen_links.add(link)
+                
+                self.log(f"  🔗 [Google] Investigating: {link}")
+                
+                # Fetch text via Jina AI
+                jina_url = f"https://r.jina.ai/{link}"
+                headers_jina = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
+                try:
+                    resp_jina = await asyncio.to_thread(requests.get, jina_url, headers=headers_jina, timeout=12)
+                    full_text = resp_jina.text if resp_jina.status_code == 200 else title
+                except:
+                    full_text = title
                     
-                    link = item.get('link')
-                    title = item.get('title', '')
-                    if not link: continue
-                    
-                    self.log(f"  🔗 [Google] Investigating: {link}")
-                    
-                    # --- THE FIX: Removed the buggy manual date string check ---
-                    # Because we use "tbs": "qdr:d", Google natively guarantees 
-                    # these results were indexed in the last 24 hours. We don't 
-                    # need to manually filter them anymore!
-                    
-                    jina_url = f"https://r.jina.ai/{link}"
-                    headers_jina = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
-                    try:
-                        resp_jina = await asyncio.to_thread(requests.get, jina_url, headers=headers_jina, timeout=12)
-                        full_text = resp_jina.text if resp_jina.status_code == 200 else title
-                    except:
-                        full_text = title
-                        
-                    if not self._append_payload("Google Web (Serper)", full_text[:2500], link, "N/A", "N/A"):
-                        break
-                    await asyncio.sleep(0.2)
-            except Exception as e:
-                self.log(f"❌ Serper Error: {e}")
+                if not self._append_payload("Google Web (Serper)", full_text[:2500], link, "N/A", "N/A"):
+                    break
+                await asyncio.sleep(0.2)
+                
+        except Exception as e:
+            self.log(f"❌ Serper Batch Error: {e}")
 
     # =========================================================
     # DYNAMIC ORCHESTRATOR
