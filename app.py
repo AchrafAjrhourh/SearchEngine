@@ -2,7 +2,7 @@ import streamlit as st
 import logging
 import json
 import os
-import re  # <--- ADD THIS HERE
+import re  
 from config import setup_logging
 from extractor import execute_deep_social_extraction
 from summarizer import summarize_news
@@ -18,24 +18,18 @@ if not os.path.exists("entities.json"):
         json.dump({
             "entities": {
                 "Mehdi Bensaïd": {"id": "MB", "keywords": ["مهدي بنسعيد", "Mehdi Bensaïd"]}
-            },
-            "scopes": {
-                "Réseaux Sociaux (Social Media)": "RS",
-                "Siaq I3lami / Politique (News & Web)": "PE"
             }
         }, f, ensure_ascii=False, indent=4)
 
 with open("entities.json", "r", encoding="utf-8") as f:
     config_data = json.load(f)
     ENTITIES = config_data.get("entities", {})
-    SCOPES = config_data.get("scopes", {})
-    MODIFIERS = config_data.get("modifiers", []) # <-- NEW
 
 # --- WEB PAGE CONFIGURATION ---
 st.set_page_config(page_title="Global News Aggregator", page_icon="🌍", layout="centered")
 
 st.title("🌍 Global AI News Aggregator")
-st.markdown("Sélectionnez une cible et une portée de recherche pour générer le rapport.")
+st.markdown("Sélectionnez ou tapez une cible pour générer le rapport d'intelligence.")
 st.divider()
 
 # --- SESSION STATE INITIALIZATION (Mobile Persistence) ---
@@ -49,15 +43,8 @@ if "pdf_data" not in st.session_state:
     st.session_state.pdf_data = None
 
 # --- USER INPUT ---
-col1, col2 = st.columns(2)
-
-with col1:
-    options = ["-- Recherche personnalisée --"] + list(ENTITIES.keys())
-    selected_id = st.selectbox("🕵️ Cible:", options)
-
-with col2:
-    selected_scope_display = st.selectbox("📡 Type de source (Scope):", list(SCOPES.keys()))
-    scope_id = SCOPES[selected_scope_display]
+options = ["-- Recherche personnalisée --"] + list(ENTITIES.keys())
+selected_id = st.selectbox("🕵️ Cible:", options)
 
 if selected_id == "-- Recherche personnalisée --":
     custom_name = st.text_input("Ou tapez un nom libre:")
@@ -73,8 +60,7 @@ if st.button("Generate Briefing"):
     if not target_keywords:
         st.error("Veuillez entrer ou sélectionner un nom.")
     else:
-        composite_id = f"{entity_id}-{scope_id}"
-        st.session_state.last_searched = f"{display_name}_{scope_id}"
+        st.session_state.last_searched = display_name
         st.session_state.final_report = None 
         
         # 1. Create a "Terminal" placeholder
@@ -84,16 +70,15 @@ if st.button("Generate Briefing"):
         # 2. Define the callback function to update the UI
         def update_log(msg):
             log_messages.append(msg)
-            # Display logs as a code block to look like a terminal
             log_container.code("\n".join(log_messages))
 
-        with st.spinner(f"🔍 Extraction [{scope_id}] pour '{display_name}'..."):
-            # We now pass the MODIFIERS list to the extractor!
-            data = execute_deep_social_extraction(target_keywords, scope_id, MODIFIERS, log_callback=update_log)
+        with st.spinner(f"🔍 Extraction globale en cours pour '{display_name}'..."):
+            # Cleaned up: No more scope_id or modifiers
+            data = execute_deep_social_extraction(target_keywords, log_callback=update_log)
             
             if data:
                 with st.spinner("🧠 IA en cours de synthèse..."):
-                    report = summarize_news(display_name, composite_id, data)
+                    report = summarize_news(display_name, entity_id, data)
                     st.session_state.final_report = report
                     
                     # 🚀 MOBILE FIX: Generate files exactly ONCE and store them in memory!
@@ -106,11 +91,11 @@ if st.button("Generate Briefing"):
         log_container.empty()
 
 # --- PERSISTENT DISPLAY & EXPORTS ---
-if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_name != "":
+if st.session_state.last_searched == display_name and display_name != "":
     if st.session_state.final_report == "EMPTY":
-        st.warning(f"Aucune donnée trouvée pour '{display_name}' dans la catégorie {scope_id}.")
+        st.warning(f"Aucune donnée trouvée pour '{display_name}' dans les dernières 12 heures.")
     elif st.session_state.final_report:
-        st.success(f"✅ Briefing Complete! (Filtre: {scope_id})")
+        st.success("✅ Briefing Complete !")
         
         # ==========================================
         # ⬇️ THE NEW EXPORT BUTTONS (MOBILE OPTIMIZED) ⬇️
@@ -123,7 +108,7 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
                 st.download_button(
                     label="📄 Télécharger en DOCX",
                     data=st.session_state.docx_data,
-                    file_name=f"Briefing_{display_name}_{scope_id}.docx",
+                    file_name=f"Briefing_{display_name}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
             
@@ -132,15 +117,12 @@ if st.session_state.last_searched == f"{display_name}_{scope_id}" and display_na
                 st.download_button(
                     label="📕 Télécharger en PDF",
                     data=st.session_state.pdf_data,
-                    file_name=f"Briefing_{display_name}_{scope_id}.pdf",
+                    file_name=f"Briefing_{display_name}.pdf",
                     mime="application/pdf"
                 )
             
         st.markdown("---")
         # ==========================================
-        
-        # Split the massive AI string into individual blocks using the horizontal rule
-        blocks = st.session_state.final_report.split("---")
         
         # Split the massive AI string into individual blocks using the horizontal rule
         blocks = st.session_state.final_report.split("---")
