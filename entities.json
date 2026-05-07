@@ -120,15 +120,5 @@
     "scopes": {
         "Social Media": "RS",
         "Politics (News & Web)": "PE"
-    },
-    "modifiers": [
-        "HB Hassan", "شؤون سياسية | Affaires politiques", "رصيف24", "جمهور عبد الإله ابن كيران",
-        "Aarab News", "Marocnews مغربية نيوز", "Alfadeha", "Mahdaoui", "Voice Of Morocco",
-        "القلم الأحمر", "Samadi Abouhiba", "عبداللطيف سودو", "alyaoum24", "رصد المغربية | Rassd Maroc",
-        "حُراس الفضيلة", "حليمة الشويكة", "alakhbar24.me", "ملاحظة Molahada", "Hassan Bouikhif",
-        "Mohssen Moufidi", "Hashtag.ma", "Anmo9ar Press", "Crash Siyasi - كراش سياسي",
-        "Soulaiman Raissouni", "Saada Boussif", "SafirCom", "تربويات اليوم", "محمد أمحجور",
-        "إبراهيم حليم", "رصد الشعب | Ra'sd Cha3B", "عبد العزيز بن صالح", "من زرع حصد",
-        "حزب الشعب", "عبد الخالق محب", "Guercif HD73 Tma9ant"
-    ]
+    }
 }
