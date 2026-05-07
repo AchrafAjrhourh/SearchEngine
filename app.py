@@ -94,6 +94,11 @@ if st.button("Generate Briefing"):
 if st.session_state.last_searched == display_name and display_name != "":
     if st.session_state.final_report == "EMPTY":
         st.warning(f"Aucune donnée trouvée pour '{display_name}' dans les dernières 12 heures.")
+        
+    # --- THE FIX: Cleanly handle when AI drops all the sources ---
+    elif st.session_state.final_report == "NO_RELEVANT_DATA":
+        st.warning(f"🔍 Des sources ont été trouvées, mais après analyse par l'IA, aucune n'a été jugée pertinente (mentions secondaires hors-sujet ou bruit social).")
+        
     elif st.session_state.final_report:
         st.success("✅ Briefing Complete !")
         
@@ -134,20 +139,16 @@ if st.session_state.last_searched == display_name and display_name != "":
                 # ==========================================
                 # 🛠️ THE NEW TAB FIX (MOBILE SCROLL SAVER)
                 # ==========================================
-                # This finds the URL and wraps it in HTML so it forces a new tab
                 ui_block = re.sub(
                     r'(\*\*Source:\*\*\s*)(https?://[^\s]+)', 
                     r'\1<a href="\2" target="_blank" rel="noopener noreferrer">\2</a>', 
                     clean_block
                 )
                 
-                # 1. Show the UI text (with HTML enabled for the new tab link)
                 st.markdown(ui_block, unsafe_allow_html=True)
                 
-                # 2. Format for WhatsApp (Using the ORIGINAL block so the URL stays raw for WhatsApp previews!)
                 whatsapp_ready_text = clean_block.replace("**", "*")
                 
-                # 3. The Magic 1-Click Copy Button
                 st_copy_to_clipboard(
                     text=whatsapp_ready_text, 
                     before_copy_label="📋 Copier pour WhatsApp", 
