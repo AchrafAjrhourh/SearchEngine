@@ -19,6 +19,8 @@ def process_batch(figure_name, batch_text, system_prompt):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
+        # --- THE FIX: We now print the exact OpenAI error to your terminal! ---
+        print(f"🚨 OpenAI API Error: {e}") 
         logging.error(f"AI Batch Error: {e}")
         return ""
 
@@ -26,7 +28,6 @@ def summarize_news(figure_name, figure_id, raw_text):
     logging.info("Generating God Mode summary in French via Data Chunking...")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
-    # We pass the base ID (e.g. "FZM") to the AI, and it handles the suffix
     base_id = figure_id.split("-")[0] if "-" in figure_id else figure_id
     
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
@@ -75,7 +76,7 @@ def summarize_news(figure_name, figure_id, raw_text):
     blocks = ["[PLATFORM:" + b for b in blocks if b.strip()]
     
     if not blocks:
-        return f"Aucune actualité pertinente trouvée pour '{figure_name}'."
+        return "NO_RELEVANT_DATA"
 
     batch_size = 8
     batches = ["\n\n".join(blocks[i:i + batch_size]) for i in range(0, len(blocks), batch_size)]
@@ -83,7 +84,8 @@ def summarize_news(figure_name, figure_id, raw_text):
     logging.info(f"Total sources found: {len(blocks)}. Processing in {len(batches)} batches...")
 
     final_results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # --- THE FIX: Lowered max_workers from 5 to 2 to prevent OpenAI Rate Limits ---
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(lambda b: process_batch(figure_name, b, system_prompt), batches))
         
         for res in results:
@@ -91,6 +93,6 @@ def summarize_news(figure_name, figure_id, raw_text):
                 final_results.append(res)
 
     if not final_results:
-         return f"🔍 Données trouvées ({len(blocks)} sources), mais après analyse, aucune n'a été jugée assez pertinente (mentions hors-sujet ou bruit)."
+         return "NO_RELEVANT_DATA"
 
     return "\n\n".join(final_results)
