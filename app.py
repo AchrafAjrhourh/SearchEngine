@@ -93,7 +93,7 @@ if st.button("Generate Briefing"):
 # --- PERSISTENT DISPLAY & EXPORTS ---
 if st.session_state.last_searched == display_name and display_name != "":
     if st.session_state.final_report == "EMPTY":
-        st.warning(f"Aucune donnée trouvée pour '{display_name}' dans les dernières 12 heures.")
+        st.warning(f"Aucune donnée trouvée pour '{display_name}' dans les dernières 24 heures.")
         
     # --- THE FIX: Cleanly handle when AI drops all the sources ---
     elif st.session_state.final_report == "NO_RELEVANT_DATA":
