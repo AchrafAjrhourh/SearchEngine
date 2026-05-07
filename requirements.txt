@@ -8,3 +8,4 @@ deep_translator
 st-copy-to-clipboard
 python-docx
 fpdf
+duckduckgo-search
