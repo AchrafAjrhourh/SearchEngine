@@ -129,7 +129,8 @@ class EliteOSINTExtractor:
                 "hl": lang_code,
                 "gl": "ma",          
                 "tbs": "qdr:d",      # Native Google filter for strictly Past 24 hours
-                "num": 100           # MAXIMIZED: Pull up to 100 results per request!
+                "num": 100,
+                "page":10           # MAXIMIZED: Pull up to 100 results per request!
             }
             
             try:
