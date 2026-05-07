@@ -11,11 +11,11 @@ from googlenewsdecoder import gnewsdecoder
 # Load environment variables
 load_dotenv()
 
-# --- CONSTANTS & CONFIG (12 HOURS) ---
+# --- CONSTANTS & CONFIG (24 HOURS) ---
 NOW = datetime.now(timezone.utc)
-TWELVE_HOURS_AGO = NOW - timedelta(hours=12)
-UNIX_12H_AGO = int(TWELVE_HOURS_AGO.timestamp())
-ISO_12H_AGO = TWELVE_HOURS_AGO.isoformat()
+TWENTY_FOUR_HOURS_AGO = NOW - timedelta(hours=24)
+UNIX_24H_AGO = int(TWENTY_FOUR_HOURS_AGO.timestamp())
+ISO_24H_AGO = TWENTY_FOUR_HOURS_AGO.isoformat()
 
 # Keys
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
@@ -31,9 +31,9 @@ class EliteOSINTExtractor:
         
         self.aggregated_data = ""
         self.result_count = 0  
-        self.max_results = 50  # Unified limit
+        self.max_results = 50  # Maxed out as you requested
 
-        # Only use the base keywords (No modifiers)
+        # Only use the base keywords
         self.search_queries = self.keywords[:2]
 
     def log(self, message):
@@ -64,10 +64,12 @@ class EliteOSINTExtractor:
             if self.result_count >= self.max_results: break
             
             encoded_query = urllib.parse.quote(f'"{kw}"')
+            
+            # --- THE FIX: Changed when:12h to when:1d (Past 24 Hours) ---
             if is_arabic(kw):
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:12h&hl=ar&gl=MA&ceid=MA:ar"
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:1d&hl=ar&gl=MA&ceid=MA:ar"
             else:
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:12h&hl=fr&gl=MA&ceid=MA:fr"
+                rss_url = f"https://news.google.com/rss/search?q={encoded_query}+when:1d&hl=fr&gl=MA&ceid=MA:fr"
 
             try:
                 self.log(f"⏳ Calling RSS News for: '{kw}'...")
@@ -105,7 +107,7 @@ class EliteOSINTExtractor:
                 self.log(f"❌ RSS News Error: {e}")
 
     # =========================================================
-    # 2. GOOGLE WEB SEARCH - VIA SERPER.DEV
+    # 2. GOOGLE WEB SEARCH - VIA SERPER.DEV (MAX YIELD)
     # =========================================================
     async def fetch_serper_google(self):
         if not SERPER_API_KEY or self.result_count >= self.max_results: return
@@ -121,12 +123,13 @@ class EliteOSINTExtractor:
             
             lang_code = "ar" if is_arabic(kw) else "fr"
             
+            # --- THE FIX: Maximize Yield ---
             payload = {
-                "q": f'"{kw}"', # Using strict quotes around the keyword for better accuracy
+                "q": kw,             # Removed strict quotes to catch more variations
                 "hl": lang_code,
                 "gl": "ma",          
-                "tbs": "qdr:h12",    # Strictly Past 12 hours native to Google
-                "num": 20            
+                "tbs": "qdr:d",      # Native Google filter for strictly Past 24 hours
+                "num": 100           # MAXIMIZED: Pull up to 100 results per request!
             }
             
             try:
@@ -156,11 +159,10 @@ class EliteOSINTExtractor:
                     
                     self.log(f"  🔗 [Google] Investigating: {link}")
                     
-                    date_str = item.get('date', '')
-                    if date_str:
-                        if "day" in date_str.lower() or "jour" in date_str.lower():
-                            self.log("     ❌ Skipped: Plus vieux que 12 heures")
-                            continue
+                    # --- THE FIX: Removed the buggy manual date string check ---
+                    # Because we use "tbs": "qdr:d", Google natively guarantees 
+                    # these results were indexed in the last 24 hours. We don't 
+                    # need to manually filter them anymore!
                     
                     jina_url = f"https://r.jina.ai/{link}"
                     headers_jina = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
@@ -183,7 +185,6 @@ class EliteOSINTExtractor:
         self.log(f"\n--- DEPLOYING UNIFIED OSINT ENGINE (MAX {self.max_results}) ---")
         tasks = []
         
-        # We run both Web (RSS) and Serper concurrently
         tasks.append(self.fetch_news_media())                  
         tasks.append(self._delayed_task(self.fetch_serper_google(), 1.5)) 
         
