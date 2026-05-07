@@ -31,7 +31,7 @@ class EliteOSINTExtractor:
         
         self.aggregated_data = ""
         self.result_count = 0  
-        self.max_results = 25  # Unified limit
+        self.max_results = 50  # Unified limit
 
         # Only use the base keywords (No modifiers)
         self.search_queries = self.keywords[:2]
