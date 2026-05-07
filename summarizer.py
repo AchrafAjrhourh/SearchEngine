@@ -26,32 +26,35 @@ def summarize_news(figure_name, figure_id, raw_text):
     logging.info("Generating God Mode summary in French via Data Chunking...")
     current_date = datetime.now().strftime("%Y-%m-%d")
     
+    # We pass the base ID (e.g. "FZM") to the AI, and it handles the suffix
+    base_id = figure_id.split("-")[0] if "-" in figure_id else figure_id
+    
     system_prompt = f"""You are an expert news analyst operating on {current_date}. 
     Your goal is to provide a highly detailed executive intelligence briefing in French for the provided sources.
     
-    ### 🛑 STRICT RELEVANCE FILTERING (CRITICAL):
-    You must act as a ruthless Editor-in-Chief. You MUST DELETE AND SKIP the following types of content (Do NOT output a block for them):
-    1. "Sidebar Noise" / Passing Mentions: If the MAIN SUBJECT is an unrelated topic (e.g., a football match, a foreign event, Minurso/Sahara general news) and the target is just caught in a sidebar or mentioned briefly, SKIP IT ENTIRELY.
-    2. Empty/Vague Social Media: If a post or video has no actual content or context (e.g., "La vidéo date du 4 mai, mais aucun contenu spécifique n'est mentionné" or it's just random hashtags without meaning), SKIP IT ENTIRELY.
-    
-    ### 🟢 ANTI-SCRAPING EXCEPTION (Keep these):
-    If a source is very short (e.g., just a Title) BUT the title itself is explicitly and primarily about "{figure_name}", you MUST PROCESS IT.
+    ### 🟢 INCLUSION RULES (CRITICAL):
+    1. Secondary Mentions ARE ALLOWED: If the target's name "{figure_name}" appears ANYWHERE in the main body of the article or social post, YOU MUST PROCESS IT.
+    2. Do NOT skip an article just because the target is a secondary subject or part of a list.
+
+    ### 🛑 EXCLUSION RULES:
+    1. SKIP ONLY IF the name is completely absent from the main text (e.g., it only appears in a sidebar of unrelated links, a footer, or a navigation menu).
+    2. Empty/Vague Social Media: If a post has no actual context (e.g., "La vidéo date du 4 mai, mais aucun contenu spécifique n'est mentionné"), SKIP IT ENTIRELY.
     
     --- 
     
     ### OUTPUT FORMAT:
-    For EACH source that passes the strict relevance filter, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
+    For EACH source that passes the rules, use EXACTLY this format. Keep the labels bolded. Separate each block with a horizontal rule (---).
     
     [Insert the raw, plain-text URL here]
     
-    **Compte:** {figure_id}
+    **Compte:** [CRITICAL RULE: Look at the URL. If the URL contains 'facebook.com', 'twitter.com', 'x.com', 'instagram.com', 'tiktok.com', 'youtube.com', or 'youtu.be', output EXACTLY "{base_id}-RS". For all other websites, output EXACTLY "{base_id}-PS".]
     
     **Tonalité:** [MUST be exactly ONE word in French: Positive, Négative, or Neutre. No explanations.]
     
-    **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the [PLATFORM] tag says YouTube, Facebook, Instagram, or if there are digits provided in the metadata, you MUST NOT estimate. Output the exact numbers provided. Example: "Moyenne (1500 Vues, 45 Commentaires)".
-    - RULE 2 (NEWS WEBSITES): ONLY if the metadata explicitly says "N/A", you MUST ESTIMATE the traffic based on the publisher's notoriety. Example: "Moyenne (~12 500 Vues estimées)".
+    **Viralité:** - RULE 1 (SOCIAL MEDIA & YOUTUBE): If the URL is a social network, output the exact numbers provided in the metadata if any, or "Moyenne" if missing.
+    - RULE 2 (NEWS WEBSITES): ONLY if it is a standard web article, you MUST ESTIMATE the traffic based on the publisher's notoriety. Example: "Moyenne (~12 500 Vues estimées)".
     
-    **Thématique:** [CRITICAL: You MUST write a DETAILED and IN-DEPTH paragraph of at least 4 to 6 sentences. Thoroughly explain the context, the core message, what the figure is doing, and the implications. DO NOT be brief! If the source is just a title, write 2 detailed sentences based on it. ALL TEXT MUST BE IN FRENCH.]
+    **Thématique:** [CRITICAL: You MUST write a DETAILED and IN-DEPTH paragraph of at least 4 to 6 sentences. Thoroughly explain the context, the core message, what the figure is doing, and the implications. DO NOT be brief! ALL TEXT MUST BE IN FRENCH.]
     
     **Niveau de Risque:** [Assess the political/PR risk: 🟢 Faible, 🟡 Modéré, or 🔴 Élevé]
     
@@ -88,6 +91,6 @@ def summarize_news(figure_name, figure_id, raw_text):
                 final_results.append(res)
 
     if not final_results:
-         return f"Aucune actualité pertinente trouvée pour '{figure_name}' dans les articles traités."
+         return f"🔍 Données trouvées ({len(blocks)} sources), mais après analyse, aucune n'a été jugée assez pertinente (mentions hors-sujet ou bruit)."
 
     return "\n\n".join(final_results)
